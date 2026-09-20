@@ -1,0 +1,57 @@
+@import url('https://fonts.bunny.net/css?family=barlow:400,500,600,700,800&family=barlow-condensed:400,500,600,700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+    html {
+        font-size: 16px;
+    }
+
+    body {
+        font-family: 'Barlow', ui-sans-serif, system-ui, sans-serif;
+    }
+}
+
+@layer components {
+    .font-num {
+        font-family: 'Barlow Condensed', ui-sans-serif, system-ui, sans-serif;
+        font-variant-numeric: tabular-nums;
+        letter-spacing: 0.01em;
+    }
+
+    .tabular {
+        font-variant-numeric: tabular-nums;
+    }
+
+    .btn {
+        @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 min-h-[44px] rounded-md font-semibold text-sm transition
+               focus:outline-none focus-visible:ring-2 focus-visible:ring-signal focus-visible:ring-offset-2
+               disabled:opacity-50 disabled:cursor-not-allowed;
+    }
+
+    .btn-primary {
+        @apply btn bg-signal text-ink hover:bg-signal-500 active:bg-signal-600 border border-transparent;
+    }
+
+    .btn-secondary {
+        @apply btn bg-white text-ink border-[1.5px] border-ink hover:bg-paper-dim active:bg-ink-100;
+    }
+
+    .btn-ghost {
+        @apply btn bg-transparent text-ink-500 hover:text-ink hover:bg-paper-dim;
+    }
+
+    .btn-danger {
+        @apply btn bg-white text-danger border border-danger hover:bg-danger/10;
+    }
+
+    .card {
+        @apply bg-white border border-line rounded-md;
+    }
+
+    .badge {
+        @apply inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium;
+    }
+}
