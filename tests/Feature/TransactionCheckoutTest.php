@@ -187,6 +187,33 @@ class TransactionCheckoutTest extends TestCase
         $this->assertEquals(9, $product->fresh()->stock);
     }
 
+    public function test_stok_tidak_dipotong_dobel_saat_dp_lalu_lunas(): void
+    {
+        $product = $this->makeProduct(stock: 6, sell: 20000);
+        $wo = $this->makeWo();
+
+        // Checkout non-final (DP) -> belum final, stok TIDAK berkurang.
+        $this->actingAs($this->kasir)->post("/pos/{$wo->id}/checkout", [
+            'payment_method' => 'cash',
+            'payment_status' => 'dp',
+            'paid_amount' => 10000,
+            'work_status' => 'proses',
+            'products' => [['product_id' => $product->id, 'qty' => 1]],
+        ])->assertRedirect();
+
+        $this->assertSame(6, $product->fresh()->stock);
+
+        // Finalisasi lunas -> stok berkurang sekali.
+        $this->actingAs($this->kasir)->post("/pos/{$wo->id}/checkout", [
+            'payment_method' => 'cash',
+            'payment_status' => 'lunas',
+            'work_status' => 'selesai',
+            'products' => [['product_id' => $product->id, 'qty' => 1]],
+        ])->assertRedirect();
+
+        $this->assertSame(5, $product->fresh()->stock);
+    }
+
     public function test_stok_tidak_cukup_ditolak_dan_rollback(): void
     {
         $product = $this->makeProduct(stock: 2);

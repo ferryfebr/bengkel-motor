@@ -28,6 +28,7 @@ class ProductController extends Controller
                         ->orWhere('code_sku', 'like', "%{$q}%");
                 });
             })
+            ->orderBy('stock')
             ->orderBy('name')
             ->paginate(15)
             ->withQueryString();

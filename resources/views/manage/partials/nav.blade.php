@@ -2,8 +2,8 @@
     $links = [
         ['route' => 'manage.products.index', 'label' => 'Produk', 'roles' => ['owner', 'super_admin', 'kasir']],
         ['route' => 'manage.categories.index', 'label' => 'Kategori', 'roles' => ['owner', 'super_admin']],
-        ['route' => 'manage.services.index', 'label' => 'Jasa', 'roles' => ['owner', 'super_admin']],
         ['route' => 'manage.mechanics.index', 'label' => 'Mekanik', 'roles' => ['owner', 'super_admin']],
+        ['route' => 'manage.users.index', 'label' => 'Akun Kasir', 'roles' => ['owner', 'super_admin']],
     ];
 @endphp
 

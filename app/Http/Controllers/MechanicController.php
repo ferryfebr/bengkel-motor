@@ -5,10 +5,8 @@ namespace App\Http\Controllers;
 use App\Http\Requests\Mechanic\StoreMechanicRequest;
 use App\Http\Requests\Mechanic\UpdateMechanicRequest;
 use App\Models\Mechanic;
-use App\Models\Setting;
 use App\Services\ActivityLogService;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class MechanicController extends Controller
@@ -18,9 +16,8 @@ class MechanicController extends Controller
     public function index(): View
     {
         $mechanics = Mechanic::orderBy('name')->paginate(15);
-        $bengkelPercentage = Setting::bengkelPercentage();
 
-        return view('manage.mechanics.index', compact('mechanics', 'bengkelPercentage'));
+        return view('manage.mechanics.index', compact('mechanics'));
     }
 
     public function create(): View
@@ -46,14 +43,21 @@ class MechanicController extends Controller
         $original = $mechanic->getOriginal();
         $mechanic->update($request->validated());
 
-        if ((float) ($original['mechanic_percentage'] ?? 0) !== (float) $mechanic->mechanic_percentage) {
+        if ((float) ($original['mechanic_percentage'] ?? 0) !== (float) $mechanic->mechanic_percentage
+            || (float) ($original['bengkel_percentage'] ?? 0) !== (float) $mechanic->bengkel_percentage) {
             $this->activityLog->log('update mechanic_ratio', $mechanic, null,
-                ['mechanic_percentage' => $original['mechanic_percentage'] ?? null],
-                ['mechanic_percentage' => $mechanic->mechanic_percentage],
+                [
+                    'mechanic_percentage' => $original['mechanic_percentage'] ?? null,
+                    'bengkel_percentage' => $original['bengkel_percentage'] ?? null,
+                ],
+                [
+                    'mechanic_percentage' => $mechanic->mechanic_percentage,
+                    'bengkel_percentage' => $mechanic->bengkel_percentage,
+                ],
             );
         }
 
-        $this->activityLog->logModelUpdate('update', $mechanic, $original, ['mechanic_percentage']);
+        $this->activityLog->logModelUpdate('update', $mechanic, $original, ['mechanic_percentage', 'bengkel_percentage']);
 
         return redirect()->route('manage.mechanics.index')->with('status', 'Mekanik berhasil diperbarui.');
     }
@@ -64,22 +68,5 @@ class MechanicController extends Controller
         $mechanic->delete();
 
         return redirect()->route('manage.mechanics.index')->with('status', 'Mekanik dihapus.');
-    }
-
-    public function updateBengkelPercentage(Request $request): RedirectResponse
-    {
-        $validated = $request->validate([
-            'bengkel_percentage' => ['required', 'numeric', 'min:0', 'max:100'],
-        ]);
-
-        $old = Setting::bengkelPercentage();
-        Setting::set(Setting::KEY_BENGKEL_PERCENTAGE, $validated['bengkel_percentage']);
-
-        $this->activityLog->log('update bengkel_ratio', Setting::class, null,
-            ['bengkel_percentage' => $old],
-            ['bengkel_percentage' => (float) $validated['bengkel_percentage']],
-        );
-
-        return redirect()->route('manage.mechanics.index')->with('status', 'Rasio bengkel diperbarui.');
     }
 }

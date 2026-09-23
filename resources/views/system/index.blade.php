@@ -10,29 +10,19 @@
             <div class="bg-success-light border border-success/40 text-success px-4 py-3 rounded-md text-sm font-medium">{{ session('status') }}</div>
         @endif
 
-        @if ($diskWarning)
-            <div class="bg-danger-light border border-danger/40 text-danger px-4 py-3 rounded-md text-sm font-medium">
-                PERINGATAN: pemakaian disk {{ $diskPercent }}% (batas {{ \App\Services\DataRetentionService::DISK_WARNING_PERCENT }}%).
-                Bersihkan arsip/log atau jalankan retensi.
-            </div>
-        @endif
-
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <x-stat-card label="Pemakaian Disk" value="{{ $diskPercent }}%" :tone="$diskWarning ? 'danger' : 'default'" />
-            <x-stat-card label="Transaksi Final / Kuota" :value="number_format($finalCount) . ' / ' . number_format($quota)" />
-            <x-stat-card label="Activity Log / Batas" :value="number_format($activityLogCount) . ' / ' . number_format($activityLogMax)" />
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <x-stat-card label="Transaksi Final" :value="number_format($finalCount)" />
+            <x-stat-card label="Activity Log" :value="number_format($activityLogCount)" />
         </div>
 
         <div class="bg-white border border-line rounded-md p-5 flex flex-wrap items-center gap-4">
-            <form method="POST" action="{{ route('system.retention') }}">
-                @csrf
-                <x-primary-button>Jalankan Retensi Sekarang</x-primary-button>
-            </form>
-            <a href="{{ route('system.activity-logs.export') }}" class="text-sm font-medium text-ink-500 hover:text-ink hover:underline">Export CSV Activity Logs</a>
+            <a href="{{ route('system.activity-logs.export') }}" class="btn-secondary">Export CSV Activity Logs</a>
+            <p class="text-xs text-ink-500">Sistem bersifat append-only. Export ini hanya mengunduh, tidak menghapus data.</p>
         </div>
 
         <div class="bg-white border border-line rounded-md overflow-hidden">
             <div class="px-4 py-3 border-b border-line font-semibold text-ink">Riwayat Arsip Transaksi</div>
+            <p class="px-4 py-2 text-xs text-ink-500 border-b border-line">Arsip CSV dibuat otomatis setiap 100 transaksi final (backup saja, data TIDAK pernah dihapus).</p>
             <table class="min-w-full font-condensed text-sm">
                 <thead class="bg-paper-dim text-ink">
                     <tr>

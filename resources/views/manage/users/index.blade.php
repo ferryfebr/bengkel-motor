@@ -1,9 +1,9 @@
 <x-app-layout>
     <x-slot name="header">
         <div class="flex items-center justify-between gap-3 w-full">
-            <h1 class="text-lg font-bold text-ink">{{ __('Master Jasa') }}</h1>
-            <a href="{{ route('manage.services.create') }}" class="btn-primary">
-                + Tambah Jasa
+            <h1 class="text-lg font-bold text-ink">{{ __('Akun Kasir') }}</h1>
+            <a href="{{ route('manage.users.create') }}" class="btn-primary">
+                + Tambah Akun Kasir
             </a>
         </div>
     </x-slot>
@@ -14,46 +14,51 @@
         @if (session('status'))
             <div class="bg-success-light border border-success/40 text-success px-4 py-3 rounded-md text-sm font-medium">{{ session('status') }}</div>
         @endif
-        <p class="text-sm text-ink-500">Tarif di sini hanya <em>template</em>. Nominal final diinput kasir saat transaksi.</p>
+        @if (session('error'))
+            <div class="bg-danger-light border border-danger/40 text-danger px-4 py-3 rounded-md text-sm font-medium">{{ session('error') }}</div>
+        @endif
+        @if ($errors->any())
+            <div class="bg-danger-light border border-danger/40 text-danger px-4 py-3 rounded-md text-sm font-medium">{{ $errors->first() }}</div>
+        @endif
 
         <div class="bg-white border border-line rounded-md overflow-x-auto">
             <table class="min-w-full font-condensed text-sm">
                 <thead class="bg-paper-dim text-ink">
                     <tr>
-                        <th class="px-4 py-3 text-left font-semibold">Nama Jasa</th>
-                        <th class="px-4 py-3 text-right font-semibold">Tarif</th>
+                        <th class="px-4 py-3 text-left font-semibold">Nama</th>
+                        <th class="px-4 py-3 text-left font-semibold">Username</th>
                         <th class="px-4 py-3 text-center font-semibold">Status</th>
                         <th class="px-4 py-3 text-right font-semibold">Aksi</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-line">
-                    @forelse ($services as $service)
+                    @forelse ($users as $user)
                         <tr class="hover:bg-paper-dim/60 transition-colors">
-                            <td class="px-4 py-2.5 text-ink">{{ $service->name }}</td>
-                            <td class="px-4 py-2.5 text-right tabular text-ink">{{ number_format($service->price, 0, ',', '.') }}</td>
+                            <td class="px-4 py-2.5 text-ink">{{ $user->name }}</td>
+                            <td class="px-4 py-2.5 font-mono text-xs text-ink-600">{{ $user->username }}</td>
                             <td class="px-4 py-2.5 text-center">
-                                @if ($service->is_active)
+                                @if ($user->is_active)
                                     <span class="badge bg-success-light text-success">✅ Aktif</span>
                                 @else
                                     <span class="badge bg-paper-dim text-ink-500">Nonaktif</span>
                                 @endif
                             </td>
                             <td class="px-4 py-2.5 text-right whitespace-nowrap">
-                                <a href="{{ route('manage.services.edit', $service) }}" class="text-ink font-medium hover:underline">Edit</a>
-                                <form method="POST" action="{{ route('manage.services.destroy', $service) }}" class="inline"
-                                      onsubmit="return confirm('Hapus jasa ini?')">
+                                <a href="{{ route('manage.users.edit', $user) }}" class="btn-secondary px-3">Edit</a>
+                                <form method="POST" action="{{ route('manage.users.destroy', $user) }}" class="inline"
+                                      onsubmit="return confirm('Hapus akun kasir ini?')">
                                     @csrf @method('DELETE')
-                                    <button class="text-danger font-medium hover:underline ms-3">Hapus</button>
+                                    <button class="btn-danger px-3 ms-2">Hapus</button>
                                 </form>
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="4" class="px-4 py-10 text-center text-ink-400">Belum ada jasa.</td></tr>
+                        <tr><td colspan="4" class="px-4 py-10 text-center text-ink-400">Belum ada akun kasir.</td></tr>
                     @endforelse
                 </tbody>
             </table>
         </div>
 
-        {{ $services->links() }}
+        {{ $users->links() }}
     </div>
 </x-app-layout>

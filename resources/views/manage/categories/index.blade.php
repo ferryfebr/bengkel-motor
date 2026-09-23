@@ -33,11 +33,11 @@
                             <td class="px-4 py-2.5 text-ink">{{ $category->name }}</td>
                             <td class="px-4 py-2.5 text-right tabular text-ink">{{ $category->products_count }}</td>
                             <td class="px-4 py-2.5 text-right whitespace-nowrap">
-                                <a href="{{ route('manage.categories.edit', $category) }}" class="text-ink font-medium hover:underline">Edit</a>
+                                <a href="{{ route('manage.categories.edit', $category) }}" class="btn-secondary px-3">Edit</a>
                                 <form method="POST" action="{{ route('manage.categories.destroy', $category) }}" class="inline"
                                       onsubmit="return confirm('Hapus kategori ini?')">
                                     @csrf @method('DELETE')
-                                    <button class="text-danger font-medium hover:underline ms-3">Hapus</button>
+                                    <button class="btn-danger px-3 ms-2">Hapus</button>
                                 </form>
                             </td>
                         </tr>

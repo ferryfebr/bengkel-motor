@@ -6,12 +6,13 @@ use App\Http\Requests\WorkOrder\StoreWorkOrderRequest;
 use App\Http\Requests\WorkOrder\UpdateWorkStatusRequest;
 use App\Models\Mechanic;
 use App\Models\Product;
-use App\Models\Service;
 use App\Models\Transaction;
 use App\Services\ActivityLogService;
+use App\Services\CsvExportService;
 use App\Services\InvoiceService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
@@ -20,6 +21,7 @@ class WorkOrderController extends Controller
     public function __construct(
         private readonly InvoiceService $invoiceService,
         private readonly ActivityLogService $activityLog,
+        private readonly CsvExportService $csvExport,
     ) {}
 
     /**
@@ -28,6 +30,7 @@ class WorkOrderController extends Controller
     public function index(Request $request): View
     {
         $transactions = Transaction::with('cashier')
+            ->where('work_status', '!=', Transaction::WORK_SELESAI)
             ->when($request->filled('status') && $request->status !== 'semua', function ($query) use ($request) {
                 $query->where('work_status', $request->string('status'));
             })
@@ -49,6 +52,68 @@ class WorkOrderController extends Controller
         ]);
     }
 
+    /**
+     * Sub-page: daftar transaksi yang sudah selesai, dengan filter tanggal & pencarian.
+     */
+    public function completed(Request $request): View
+    {
+        [$from, $to] = $this->dateRange($request);
+
+        $transactions = $this->completedQuery($request, $from, $to)
+            ->with(['details', 'services'])
+            ->orderByDesc('created_at')
+            ->paginate(20)
+            ->withQueryString();
+
+        return view('work-orders.completed', [
+            'transactions' => $transactions,
+            'from' => $from,
+            'to' => $to,
+            'q' => $request->string('q')->toString(),
+        ]);
+    }
+
+    /**
+     * Export CSV transaksi selesai: rincian tiap produk/jasa + total dibayar paling kanan.
+     */
+    public function exportCompleted(Request $request): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        [$from, $to] = $this->dateRange($request);
+
+        return $this->csvExport->streamCompletedTransactions($from, $to, $request->string('q')->toString());
+    }
+
+    /**
+     * @return array{0: Carbon, 1: Carbon}
+     */
+    private function dateRange(Request $request): array
+    {
+        $validated = $request->validate([
+            'from' => ['nullable', 'date'],
+            'to' => ['nullable', 'date', 'after_or_equal:from'],
+        ]);
+
+        $from = isset($validated['from']) ? Carbon::parse($validated['from'])->startOfDay() : Carbon::today()->startOfMonth();
+        $to = isset($validated['to']) ? Carbon::parse($validated['to'])->endOfDay() : Carbon::today()->endOfDay();
+
+        return [$from, $to];
+    }
+
+    private function completedQuery(Request $request, Carbon $from, Carbon $to): \Illuminate\Database\Eloquent\Builder
+    {
+        return Transaction::query()
+            ->where('work_status', Transaction::WORK_SELESAI)
+            ->whereBetween('created_at', [$from, $to])
+            ->when($request->filled('q'), function ($query) use ($request) {
+                $q = $request->string('q');
+                $query->where(function ($sub) use ($q) {
+                    $sub->where('plate_number', 'like', "%{$q}%")
+                        ->orWhere('customer_name', 'like', "%{$q}%")
+                        ->orWhere('invoice_number', 'like', "%{$q}%");
+                });
+            });
+    }
+
     public function create(): View
     {
         return view('work-orders.create');
@@ -66,6 +131,7 @@ class WorkOrderController extends Controller
                 'impersonated_by' => $request->attributes->get('impersonated_by'),
                 'customer_name' => $request->string('customer_name'),
                 'plate_number' => strtoupper($request->string('plate_number')->toString()),
+                'motor_type' => $request->input('motor_type'),
                 'complaint' => $request->input('complaint'),
                 'work_status' => Transaction::WORK_ANTRE,
                 'payment_status' => Transaction::PAY_BELUM,
@@ -73,7 +139,7 @@ class WorkOrderController extends Controller
         });
 
         $this->activityLog->log('create wo', $transaction, new: $transaction->only([
-            'invoice_number', 'customer_name', 'plate_number', 'complaint', 'work_status',
+            'invoice_number', 'customer_name', 'plate_number', 'motor_type', 'complaint', 'work_status',
         ]));
 
         return redirect()->route('work-orders.show', $transaction)
@@ -87,7 +153,6 @@ class WorkOrderController extends Controller
         return view('work-orders.show', [
             'transaction' => $workOrder,
             'products' => Product::orderBy('name')->get(),
-            'services' => Service::where('is_active', true)->orderBy('name')->get(),
             'mechanics' => Mechanic::active()->orderBy('name')->get(),
             'canViewHpp' => $request->user()->can('viewHpp', Product::class),
         ]);
@@ -117,15 +182,20 @@ class WorkOrderController extends Controller
     }
 
     /**
-     * Queue Board - layar pantau antrean (read-only). Dapat diakses tanpa login.
+     * Daftar Antrean - ringkasan & daftar motor yang belum selesai.
      */
-    public function queueBoard(): View
+    public function queue(): View
     {
         $ongoing = Transaction::where('work_status', '!=', Transaction::WORK_SELESAI)
+            ->with('cashier')
             ->orderByRaw("CASE work_status WHEN 'proses' THEN 0 ELSE 1 END")
             ->orderBy('created_at')
-            ->get(['id', 'invoice_number', 'plate_number', 'work_status', 'created_at']);
+            ->get();
 
-        return view('work-orders.queue-board', compact('ongoing'));
+        return view('work-orders.queue', [
+            'ongoing' => $ongoing,
+            'antreCount' => $ongoing->where('work_status', Transaction::WORK_ANTRE)->count(),
+            'prosesCount' => $ongoing->where('work_status', Transaction::WORK_PROSES)->count(),
+        ]);
     }
 }

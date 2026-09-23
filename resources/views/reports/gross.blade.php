@@ -8,7 +8,14 @@
             <div class="bg-success-light border border-success/40 text-success px-4 py-3 rounded-md text-sm font-medium">{{ session('status') }}</div>
         @endif
 
+        <div class="flex flex-wrap gap-2">
+            <a href="{{ route('reports.gross', ['period' => 'today']) }}" class="btn-secondary px-4 {{ $period === 'today' ? 'ring-2 ring-ink' : '' }}">Harian</a>
+            <a href="{{ route('reports.gross', ['period' => 'week']) }}" class="btn-secondary px-4 {{ $period === 'week' ? 'ring-2 ring-ink' : '' }}">Mingguan</a>
+            <a href="{{ route('reports.gross', ['period' => 'month']) }}" class="btn-secondary px-4 {{ $period === 'month' ? 'ring-2 ring-ink' : '' }}">Bulanan</a>
+        </div>
+
         <form method="GET" class="bg-white border border-line rounded-md p-4 flex flex-wrap items-end gap-3">
+            <input type="hidden" name="period" value="">
             <div>
                 <x-input-label for="from" value="Dari" />
                 <x-text-input id="from" name="from" type="date" class="mt-1" :value="$from->toDateString()" />
@@ -19,10 +26,10 @@
             </div>
             <x-primary-button>Tampilkan</x-primary-button>
             <a href="{{ route('reports.export-transactions', ['from' => $from->toDateString(), 'to' => $to->toDateString()]) }}"
-               class="text-sm font-medium text-ink-500 hover:text-ink hover:underline">Export CSV Transaksi</a>
+               class="btn-secondary">Export CSV Transaksi</a>
             @if ($canViewNet)
                 <a href="{{ route('reports.net', ['from' => $from->toDateString(), 'to' => $to->toDateString()]) }}"
-                   class="text-sm font-medium text-ink-500 hover:text-ink hover:underline">Lihat Omset Bersih</a>
+                   class="btn-secondary">Lihat Omset Bersih</a>
             @endif
         </form>
 

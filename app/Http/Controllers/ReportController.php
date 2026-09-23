@@ -32,6 +32,7 @@ class ReportController extends Controller
             'summary' => $this->reportService->revenue($from, $to),
             'series' => $this->reportService->dailySeries($from, $to),
             'canViewNet' => $request->user()->hasRole('owner', 'super_admin'),
+            'period' => $request->string('period')->toString(),
         ]);
     }
 
@@ -49,6 +50,7 @@ class ReportController extends Controller
             'to' => $to,
             'summary' => $this->reportService->revenue($from, $to),
             'series' => $this->reportService->dailySeries($from, $to),
+            'period' => $request->string('period')->toString(),
         ]);
     }
 
@@ -63,6 +65,7 @@ class ReportController extends Controller
             'from' => $from,
             'to' => $to,
             'commissions' => $this->reportService->mechanicCommission($from, $to),
+            'period' => $request->string('period')->toString(),
         ]);
     }
 
@@ -97,6 +100,17 @@ class ReportController extends Controller
      */
     private function range(Request $request): array
     {
+        $period = $request->string('period')->toString();
+        if ($period === 'today') {
+            return [Carbon::today()->startOfDay(), Carbon::today()->endOfDay()];
+        }
+        if ($period === 'week') {
+            return [Carbon::now()->startOfWeek()->startOfDay(), Carbon::now()->endOfWeek()->endOfDay()];
+        }
+        if ($period === 'month') {
+            return [Carbon::now()->startOfMonth()->startOfDay(), Carbon::now()->endOfMonth()->endOfDay()];
+        }
+
         $validated = $request->validate([
             'from' => ['nullable', 'date'],
             'to' => ['nullable', 'date', 'after_or_equal:from'],

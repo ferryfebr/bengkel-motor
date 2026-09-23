@@ -146,20 +146,15 @@ class ActivityLogRecordingTest extends TestCase
     public function test_ubah_rasio_mekanik_dan_bengkel_tercatat(): void
     {
         $owner = User::factory()->owner()->create();
-        $mechanic = Mechanic::create(['name' => 'Andi', 'mechanic_percentage' => 80]);
+        $mechanic = Mechanic::create(['name' => 'Andi', 'mechanic_percentage' => 80, 'bengkel_percentage' => 20]);
 
         $this->actingAs($owner)->put("/manage/mechanics/{$mechanic->id}", [
             'name' => 'Andi',
-            'mechanic_percentage' => 90,
+            'mechanic_percentage' => 85,
+            'bengkel_percentage' => 15,
             'is_active' => 1,
         ])->assertRedirect('/manage/mechanics');
 
         $this->assertDatabaseHas('activity_logs', ['action' => 'update mechanic_ratio']);
-
-        $this->actingAs($owner)->put('/manage/mechanics-bengkel-percentage', [
-            'bengkel_percentage' => 15,
-        ])->assertRedirect('/manage/mechanics');
-
-        $this->assertDatabaseHas('activity_logs', ['action' => 'update bengkel_ratio']);
     }
 }

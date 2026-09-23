@@ -30,6 +30,7 @@ class Transaction extends Model
         'impersonated_by',
         'customer_name',
         'plate_number',
+        'motor_type',
         'complaint',
         'subtotal_products',
         'subtotal_services',

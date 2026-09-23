@@ -8,6 +8,12 @@
             <div class="bg-success-light border border-success/40 text-success px-4 py-3 rounded-md text-sm font-medium">{{ session('status') }}</div>
         @endif
 
+        <div class="flex flex-wrap gap-2">
+            <a href="{{ route('reports.net', ['period' => 'today']) }}" class="btn-secondary px-4 {{ $period === 'today' ? 'ring-2 ring-ink' : '' }}">Harian</a>
+            <a href="{{ route('reports.net', ['period' => 'week']) }}" class="btn-secondary px-4 {{ $period === 'week' ? 'ring-2 ring-ink' : '' }}">Mingguan</a>
+            <a href="{{ route('reports.net', ['period' => 'month']) }}" class="btn-secondary px-4 {{ $period === 'month' ? 'ring-2 ring-ink' : '' }}">Bulanan</a>
+        </div>
+
         <form method="GET" class="bg-white border border-line rounded-md p-4 flex flex-wrap items-end gap-3">
             <div>
                 <x-input-label for="from" value="Dari" />
@@ -19,7 +25,7 @@
             </div>
             <x-primary-button>Tampilkan</x-primary-button>
             <a href="{{ route('reports.gross', ['from' => $from->toDateString(), 'to' => $to->toDateString()]) }}"
-               class="text-sm font-medium text-ink-500 hover:text-ink hover:underline">Lihat Omset Kotor</a>
+               class="btn-secondary">Lihat Omset Kotor</a>
         </form>
 
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">

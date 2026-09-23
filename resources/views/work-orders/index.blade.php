@@ -6,9 +6,13 @@
                 <span class="sm:hidden">Work Order</span>
             </h1>
             <div class="flex items-center gap-2">
-                <a href="{{ route('queue-board') }}" target="_blank"
+                <a href="{{ route('work-orders.completed') }}"
                    class="btn-secondary hidden sm:inline-flex">
-                    Queue Board
+                    Transaksi Selesai
+                </a>
+                <a href="{{ route('work-orders.queue') }}"
+                   class="btn-secondary hidden sm:inline-flex">
+                    Daftar Antrean
                 </a>
                 <a href="{{ route('work-orders.create') }}"
                    class="btn-primary">
@@ -32,7 +36,7 @@
             <div>
                 <x-input-label for="status" :value="__('Status Pengerjaan')" />
                 <select id="status" name="status" class="mt-1 border-line rounded-md focus:border-signal focus:ring-signal min-h-[44px]">
-                    @foreach (['semua' => 'Semua', 'antre' => 'Antre', 'proses' => 'Proses', 'selesai' => 'Selesai'] as $val => $label)
+                    @foreach (['semua' => 'Semua', 'antre' => 'Antre', 'proses' => 'Proses'] as $val => $label)
                         <option value="{{ $val }}" @selected($statusFilter === $val)>{{ $label }}</option>
                     @endforeach
                 </select>
@@ -46,6 +50,7 @@
                     <tr>
                         <th class="px-4 py-3 text-left font-semibold">Invoice</th>
                         <th class="px-4 py-3 text-left font-semibold">Plat</th>
+                        <th class="px-4 py-3 text-left font-semibold">Jenis Motor</th>
                         <th class="px-4 py-3 text-left font-semibold">Customer</th>
                         <th class="px-4 py-3 text-left font-semibold">Keluhan</th>
                         <th class="px-4 py-3 text-center font-semibold">Status</th>
@@ -58,13 +63,14 @@
                         <tr class="{{ $t->isFinal() ? 'bg-paper-dim/60' : 'hover:bg-paper-dim/60' }} transition-colors">
                             <td class="px-4 py-2.5 font-mono text-xs text-ink-500">{{ $t->invoice_number }}</td>
                             <td class="px-4 py-2.5 font-semibold text-ink">{{ $t->plate_number }}</td>
+                            <td class="px-4 py-2.5 text-ink-700">{{ $t->motor_type ?: '-' }}</td>
                             <td class="px-4 py-2.5 text-ink-700">{{ $t->customer_name }}</td>
                             <td class="px-4 py-2.5 text-ink-400 max-w-xs truncate">{{ $t->complaint ?: '-' }}</td>
                             <td class="px-4 py-2.5 text-center">
                                 @php
                                     $wBadge = match($t->work_status) {
                                         'selesai' => 'bg-success-light text-success',
-                                        'proses' => 'bg-signal-100 text-ink-700',
+                                        'proses' => 'bg-ink text-paper',
                                         default => 'bg-paper-dim text-ink-600',
                                     };
                                     $wIcon = match($t->work_status) {
@@ -84,7 +90,7 @@
                                 @php
                                     $pBadge = match($t->payment_status) {
                                         'lunas' => 'bg-success-light text-success',
-                                        'dp' => 'bg-signal-100 text-ink-700',
+                                        'dp' => 'bg-paper-dim text-ink-700',
                                         default => 'bg-danger-light text-danger',
                                     };
                                     $pIcon = match($t->payment_status) {
@@ -101,11 +107,11 @@
                                 <span class="badge {{ $pBadge }}">{{ $pIcon }} {{ $pLabel }}</span>
                             </td>
                             <td class="px-4 py-2.5 text-right">
-                                <a href="{{ route('work-orders.show', $t) }}" class="font-medium text-ink hover:underline">Detail</a>
+                                <a href="{{ route('work-orders.show', $t) }}" class="btn-secondary px-3">Detail</a>
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="7" class="px-4 py-10 text-center text-ink-400">Belum ada Work Order.</td></tr>
+                        <tr><td colspan="8" class="px-4 py-10 text-center text-ink-400">Belum ada Work Order.</td></tr>
                     @endforelse
                 </tbody>
             </table>

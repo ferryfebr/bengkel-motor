@@ -4,6 +4,12 @@
     </x-slot>
 
     <div class="space-y-4">
+        <div class="flex flex-wrap gap-2">
+            <a href="{{ route('reports.mechanics', ['period' => 'today']) }}" class="btn-secondary px-4 {{ $period === 'today' ? 'ring-2 ring-ink' : '' }}">Harian</a>
+            <a href="{{ route('reports.mechanics', ['period' => 'week']) }}" class="btn-secondary px-4 {{ $period === 'week' ? 'ring-2 ring-ink' : '' }}">Mingguan</a>
+            <a href="{{ route('reports.mechanics', ['period' => 'month']) }}" class="btn-secondary px-4 {{ $period === 'month' ? 'ring-2 ring-ink' : '' }}">Bulanan</a>
+        </div>
+
         <form method="GET" class="bg-white border border-line rounded-md p-4 flex flex-wrap items-end gap-3">
             <div>
                 <x-input-label for="from" value="Dari" />

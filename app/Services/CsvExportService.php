@@ -24,18 +24,29 @@ class CsvExportService
      */
     public function streamTransactions(?Carbon $from = null, ?Carbon $to = null): StreamedResponse
     {
+        $query = Transaction::query()
+            ->where('work_status', Transaction::WORK_SELESAI)
+            ->where('payment_status', Transaction::PAY_LUNAS)
+            ->when($from, fn ($q) => $q->where('created_at', '>=', $from->copy()->startOfDay()))
+            ->when($to, fn ($q) => $q->where('created_at', '<=', $to->copy()->endOfDay()));
+
+        $maxItems = (clone $query)->withCount(['details', 'services'])->get()
+            ->map(fn ($t) => $t->details_count + $t->services_count)->max() ?? 0;
+
         $filename = 'transaksi-'.($from?->toDateString() ?? 'awal').'-'.($to?->toDateString() ?? 'kini').'.csv';
 
-        return response()->streamDownload(function () use ($from, $to) {
+        return response()->streamDownload(function () use ($query, $maxItems) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, [
-                'invoice_number', 'created_at', 'finalized_at', 'customer_name', 'plate_number',
-                'cashier_id', 'subtotal_products', 'subtotal_services', 'grand_total',
-                'payment_method', 'work_status', 'payment_status', 'details', 'services', 'mechanic_shares',
-            ]);
 
-            foreach ($this->transactionRows($from, $to) as $row) {
-                fputcsv($out, $row);
+            $header = ['Invoice', 'Tanggal', 'Customer', 'Plat', 'Jenis Motor'];
+            for ($i = 1; $i <= $maxItems; $i++) {
+                $header[] = 'Item '.$i;
+            }
+            $header[] = 'Total';
+            fputcsv($out, $header);
+
+            foreach ($query->with(['details.product', 'services'])->orderBy('id')->lazyById(200) as $t) {
+                fputcsv($out, $this->summaryRow($t, $maxItems));
             }
 
             fclose($out);
@@ -43,32 +54,112 @@ class CsvExportService
     }
 
     /**
+     * Baris ringkas transaksi: item beserta biaya + total di kolom terakhir.
+     *
+     * @return array<int, mixed>
+     */
+    private function summaryRow(Transaction $t, int $maxItems): array
+    {
+        $items = $t->details->map(function ($d) {
+            $name = $d->is_external ? $d->external_name : optional($d->product)->name;
+
+            return $name.' x'.$d->qty.' = Rp '.number_format((float) $d->line_total, 0, ',', '.');
+        })->all();
+
+        foreach ($t->services as $s) {
+            $items[] = $s->service_name.' = Rp '.number_format((float) $s->service_price, 0, ',', '.');
+        }
+
+        $row = [
+            $t->invoice_number,
+            optional($t->created_at)->format('d/m/Y H:i'),
+            $t->customer_name,
+            $t->plate_number,
+            $t->motor_type,
+        ];
+
+        for ($i = 0; $i < $maxItems; $i++) {
+            $row[] = $items[$i] ?? '';
+        }
+
+        $row[] = 'Rp '.number_format((float) $t->grand_total, 0, ',', '.');
+
+        return $row;
+    }
+
+    /**
+     * Stream CSV transaksi yang sudah selesai: rincian tiap produk & jasa
+     * beserta biayanya, dengan total dibayar di kolom paling kanan.
+     */
+    public function streamCompletedTransactions(?Carbon $from = null, ?Carbon $to = null, string $search = ''): StreamedResponse
+    {
+        $maxItems = $this->completedQuery($from, $to, $search)
+            ->withCount(['details', 'services'])
+            ->get()
+            ->map(fn ($t) => $t->details_count + $t->services_count)
+            ->max() ?? 0;
+
+        $filename = 'transaksi-selesai-'.($from?->toDateString() ?? 'awal').'-'.($to?->toDateString() ?? 'kini').'.csv';
+
+        return response()->streamDownload(function () use ($from, $to, $search, $maxItems) {
+            $out = fopen('php://output', 'w');
+
+            $header = ['Invoice', 'Tanggal', 'Customer', 'Plat', 'Jenis Motor'];
+            for ($i = 1; $i <= $maxItems; $i++) {
+                $header[] = 'Item '.$i;
+            }
+            $header[] = 'Total Dibayar';
+            fputcsv($out, $header);
+
+            foreach ($this->completedQuery($from, $to, $search)
+                ->with(['details.product', 'services'])
+                ->orderBy('id')
+                ->lazyById(200) as $t) {
+                fputcsv($out, $this->summaryRow($t, $maxItems));
+            }
+
+            fclose($out);
+        }, $filename, ['Content-Type' => 'text/csv']);
+    }
+
+    private function completedQuery(?Carbon $from, ?Carbon $to, string $search): \Illuminate\Database\Eloquent\Builder
+    {
+        return Transaction::query()
+            ->where('work_status', Transaction::WORK_SELESAI)
+            ->when($from, fn ($q) => $q->where('created_at', '>=', $from->copy()->startOfDay()))
+            ->when($to, fn ($q) => $q->where('created_at', '<=', $to->copy()->endOfDay()))
+            ->when($search !== '', function ($q) use ($search) {
+                $q->where(function ($sub) use ($search) {
+                    $sub->where('plate_number', 'like', "%{$search}%")
+                        ->orWhere('customer_name', 'like', "%{$search}%")
+                        ->orWhere('invoice_number', 'like', "%{$search}%");
+                });
+            });
+    }
+
+    /**
      * Stream CSV activity_logs (retensi J9).
      */
     public function streamActivityLogs(?Carbon $before = null): StreamedResponse
     {
-        $filename = 'activity-logs-before-'.($before?->toDateString() ?? Carbon::now()->toDateString()).'.csv';
+        $filename = 'aktivitas-'.($before?->toDateString() ?? Carbon::now()->toDateString()).'.csv';
 
         return response()->streamDownload(function () use ($before) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['id', 'created_at', 'user_id', 'impersonated_by', 'action', 'model_type', 'model_id', 'old_values', 'new_values']);
+            fputcsv($out, ['Waktu', 'Aktor', 'Kategori', 'Aktivitas', 'Keterangan']);
 
-            $query = ActivityLog::query()->orderBy('id');
+            $query = ActivityLog::with('user')->orderBy('id');
             if ($before) {
                 $query->where('created_at', '<', $before);
             }
 
             foreach ($query->lazyById(500) as $log) {
                 fputcsv($out, [
-                    $log->id,
-                    optional($log->created_at)->toDateTimeString(),
-                    $log->user_id,
-                    $log->impersonated_by,
-                    $log->action,
-                    $log->model_type,
-                    $log->model_id,
-                    json_encode($log->old_values),
-                    json_encode($log->new_values),
+                    optional($log->created_at)->format('d/m/Y H:i'),
+                    $log->user?->name ?? '-',
+                    \App\Support\ActivityPresenter::CATEGORIES[\App\Support\ActivityPresenter::category($log->action, $log->model_type)] ?? '-',
+                    \App\Support\ActivityPresenter::label($log->action),
+                    \App\Support\ActivityPresenter::describe($log),
                 ]);
             }
 

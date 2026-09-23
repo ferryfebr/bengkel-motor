@@ -3,10 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\ActivityLog;
+use App\Models\Transaction;
 use App\Models\TransactionArchive;
 use App\Services\CsvExportService;
-use App\Services\DataRetentionService;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\View\View;
@@ -15,43 +14,27 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class SystemController extends Controller
 {
     public function __construct(
-        private readonly DataRetentionService $retention,
         private readonly CsvExportService $csvExport,
     ) {}
 
     /**
-     * Panel sistem Super Admin: status disk, kuota transaksi, arsip, retensi.
+     * Panel sistem Super Admin (read-only).
+     * Tidak ada fitur retensi/auto-hapus data — sistem append-only (SECURITY.md).
      */
     public function index(): View
     {
         return view('system.index', [
-            'finalCount' => $this->retention->finalTransactionCount(),
-            'quota' => DataRetentionService::QUOTA_FINAL_TRANSACTIONS,
-            'diskPercent' => $this->retention->diskUsagePercent(),
-            'diskWarning' => $this->retention->diskUsageWarning(),
+            'finalCount' => Transaction::query()
+                ->where('work_status', Transaction::WORK_SELESAI)
+                ->where('payment_status', Transaction::PAY_LUNAS)
+                ->count(),
             'activityLogCount' => ActivityLog::count(),
-            'activityLogMax' => DataRetentionService::ACTIVITY_LOG_MAX_ROWS,
             'archives' => TransactionArchive::orderByDesc('created_at')->paginate(15),
         ]);
     }
 
     /**
-     * Jalankan retensi manual (fallback bila cron tidak andal — R3).
-     */
-    public function runRetention(): RedirectResponse
-    {
-        $result = $this->retention->runAll();
-
-        return back()->with('status', sprintf(
-            'Retensi dijalankan: %d transaksi diarsipkan, %d file arsip dihapus, %d activity log diarsipkan.',
-            $result['transactions']['archived'],
-            $result['archive_files']['deleted_files'],
-            $result['activity_logs']['archived'],
-        ));
-    }
-
-    /**
-     * Export CSV activity_logs (retensi J9).
+     * Export CSV activity_logs (backup manual, tanpa menghapus data).
      */
     public function exportActivityLogs(Request $request): StreamedResponse
     {

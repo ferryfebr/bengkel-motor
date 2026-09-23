@@ -20,10 +20,12 @@
 
         $items = [
             ['route' => 'dashboard', 'label' => 'Dashboard', 'pattern' => 'dashboard', 'roles' => ['kasir', 'owner', 'super_admin'], 'icon' => 'home'],
-            ['route' => 'work-orders.index', 'label' => 'Work Order', 'pattern' => 'work-orders.*', 'roles' => ['kasir', 'owner', 'super_admin'], 'icon' => 'clipboard'],
+            ['route' => 'work-orders.index', 'label' => 'Work Order', 'pattern' => ['work-orders.index', 'work-orders.create', 'work-orders.show', 'work-orders.completed'], 'roles' => ['kasir', 'owner', 'super_admin'], 'icon' => 'clipboard'],
+            ['route' => 'work-orders.queue', 'label' => 'Daftar Antrean', 'pattern' => 'work-orders.queue', 'roles' => ['kasir', 'owner', 'super_admin'], 'icon' => 'queue'],
             ['route' => 'cash.index', 'label' => 'Kas Bengkel', 'pattern' => 'cash.*', 'roles' => ['kasir', 'owner', 'super_admin'], 'icon' => 'cash'],
             ['route' => 'manage.index', 'label' => 'Manajemen', 'pattern' => 'manage.*', 'roles' => ['kasir', 'owner', 'super_admin'], 'icon' => 'box'],
             ['route' => 'reports.gross', 'label' => 'Laporan', 'pattern' => 'reports.*', 'roles' => ['kasir', 'owner', 'super_admin'], 'icon' => 'chart'],
+            ['route' => 'activity.index', 'label' => 'Aktivitas', 'pattern' => 'activity.*', 'roles' => ['owner', 'super_admin'], 'icon' => 'activity'],
             ['route' => 'impersonation.index', 'label' => 'Login Sebagai', 'pattern' => 'impersonation.*', 'roles' => ['owner', 'super_admin'], 'icon' => 'switch'],
             ['route' => 'system.index', 'label' => 'Panel Sistem', 'pattern' => 'system.*', 'roles' => ['super_admin'], 'icon' => 'server'],
         ];
@@ -72,6 +74,12 @@
                                         @break
                                     @case('chart')
                                         <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>
+                                        @break
+                                    @case('activity')
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 2M12 3a9 9 0 1 0 9 9"/><path stroke-linecap="round" stroke-linejoin="round" d="M21 3v6h-6"/></svg>
+                                        @break
+                                    @case('queue')
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h10"/></svg>
                                         @break
                                     @case('switch')
                                         <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M21 16v3a2 2 0 0 1-2 2h-3M3 8V5a2 2 0 0 1 2-2h3M9 12h6"/></svg>
@@ -136,6 +144,9 @@
                             </x-slot>
                             <x-slot name="content">
                                 <x-dropdown-link :href="route('profile.edit')">{{ __('Profil') }}</x-dropdown-link>
+                                @if ($user->canImpersonate())
+                                    <x-dropdown-link :href="route('impersonation.index')">{{ __('Login Sebagai') }}</x-dropdown-link>
+                                @endif
                                 <form method="POST" action="{{ route('logout') }}">
                                     @csrf
                                     <x-dropdown-link :href="route('logout')"

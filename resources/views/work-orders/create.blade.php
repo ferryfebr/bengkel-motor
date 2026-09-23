@@ -26,12 +26,20 @@
                     <x-text-input id="plate_number" name="plate_number" type="text" class="mt-1 block w-full uppercase"
                                   :value="old('plate_number')" required autofocus placeholder="B 1234 XY" />
                     <x-input-error :messages="$errors->get('plate_number')" class="mt-2" />
+                    <p class="text-xs text-ink-400 mt-1">Wajib diisi. Isi <strong>XXXX</strong> bila motor tidak berplat nomor.</p>
                 </div>
                 <div>
                     <x-input-label for="customer_name" :value="__('Nama Customer')" />
                     <x-text-input id="customer_name" name="customer_name" type="text" class="mt-1 block w-full"
-                                  :value="old('customer_name')" required />
+                                  :value="old('customer_name')" />
                     <x-input-error :messages="$errors->get('customer_name')" class="mt-2" />
+                    <p class="text-xs text-ink-400 mt-1" id="customer-hint">Wajib diisi bila plat nomor XXXX.</p>
+                </div>
+                <div>
+                    <x-input-label for="motor_type" :value="__('Jenis Motor')" />
+                    <x-text-input id="motor_type" name="motor_type" type="text" class="mt-1 block w-full"
+                                  :value="old('motor_type')" placeholder="mis. Honda Vario 125, Yamaha NMAX" />
+                    <x-input-error :messages="$errors->get('motor_type')" class="mt-2" />
                 </div>
                 <div>
                     <x-input-label for="complaint" :value="__('Keluhan')" />
@@ -40,9 +48,26 @@
                 </div>
                 <div class="flex items-center gap-4 pt-1">
                     <x-primary-button>{{ __('Simpan Motor Masuk') }}</x-primary-button>
-                    <a href="{{ route('work-orders.index') }}" class="text-sm font-medium text-ink-500 hover:text-ink hover:underline">Batal</a>
+                    <a href="{{ route('work-orders.index') }}" class="btn-secondary">Batal</a>
                 </div>
             </form>
         </div>
     </div>
+
+    <script>
+        (function () {
+            var plate = document.getElementById('plate_number');
+            var customer = document.getElementById('customer_name');
+            if (!plate || !customer) return;
+            function sync() {
+                if (plate.value.trim().toUpperCase() === 'XXXX') {
+                    customer.setAttribute('required', 'required');
+                } else {
+                    customer.removeAttribute('required');
+                }
+            }
+            plate.addEventListener('input', sync);
+            sync();
+        })();
+    </script>
 </x-app-layout>

@@ -18,7 +18,7 @@ class StorePosCheckoutRequest extends FormRequest
             'payment_method' => ['required', Rule::in(['cash', 'qris'])],
             'payment_status' => ['required', Rule::in(['belum_bayar', 'dp', 'lunas'])],
             'paid_amount' => ['nullable', 'numeric', 'min:0'],
-            'work_status' => ['required', Rule::in(['antre', 'proses', 'selesai'])],
+            'work_status' => ['nullable', Rule::in(['antre', 'proses', 'selesai'])],
             'print_receipt' => ['boolean'],
 
             'products' => ['array'],
@@ -32,7 +32,7 @@ class StorePosCheckoutRequest extends FormRequest
             'external_products.*.selling_price' => ['required', 'numeric', 'min:0'],
 
             'services' => ['array'],
-            'services.*.service_id' => ['nullable', 'exists:services,id'],
+            'services.*.service_id' => ['nullable', 'integer'],
             'services.*.service_name' => ['required', 'string', 'max:150'],
             'services.*.price' => ['required', 'numeric', 'min:0'],
             'services.*.shares' => ['required', 'array', 'min:1'],

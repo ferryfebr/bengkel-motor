@@ -29,6 +29,7 @@
             <div>No : {{ $transaction->invoice_number }}</div>
             <div>Tgl: {{ $transaction->created_at->format('d/m/Y H:i') }}</div>
             <div>Plat: {{ $transaction->plate_number }}</div>
+            <div>Motor: {{ $transaction->motor_type ?: '-' }}</div>
             <div>Cust: {{ $transaction->customer_name }}</div>
             <div>Kasir: {{ $transaction->cashier?->name }}</div>
             <div class="border-t border-dashed my-1"></div>

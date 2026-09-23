@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Mechanic;
 use App\Models\Product;
 use App\Models\Transaction;
+use App\Models\TransactionArchive;
 use App\Models\TransactionDetail;
 use App\Models\TransactionService as TransactionServiceModel;
 use App\Models\User;
@@ -13,11 +14,17 @@ use RuntimeException;
 
 class TransactionService
 {
+    /**
+     * Setiap kelipatan jumlah ini, transaksi final diarsipkan ke CSV (tanpa dihapus).
+     */
+    public const ARCHIVE_EVERY = 100;
+
     public function __construct(
         private readonly CommissionService $commissionService,
         private readonly MechanicShareService $mechanicShareService,
         private readonly StockService $stockService,
         private readonly CashService $cashService,
+        private readonly CsvExportService $csvExport,
     ) {}
 
     /**
@@ -115,13 +122,13 @@ class TransactionService
      *
      * @param  array{products?: array, external_products?: array, services?: array, payment_method?: string, payment_status?: string, work_status?: string}  $payload
      */
-    public function saveDraft(Transaction $transaction, array $payload, User $user): Transaction
+    public function saveDraft(Transaction $transaction, array $payload, User $user, ?int $impersonatedBy = null): Transaction
     {
         if ($transaction->isFinal()) {
             throw new RuntimeException('Transaksi sudah final, tidak dapat diubah.');
         }
 
-        return DB::transaction(function () use ($transaction, $payload, $user) {
+        return DB::transaction(function () use ($transaction, $payload, $user, $impersonatedBy) {
             $transaction->details()->delete();
             $transaction->mechanicShares()->delete();
             $transaction->services()->delete();
@@ -139,6 +146,9 @@ class TransactionService
                 'paid_amount' => $paidAmount,
                 'finalized_at' => null,
             ]);
+
+            // Kas masuk dari uang yang benar-benar diterima (mis. DP).
+            $this->cashService->recordTransactionIncome($transaction->refresh(), $user, $impersonatedBy);
 
             return $transaction->refresh();
         });
@@ -190,9 +200,6 @@ class TransactionService
                 default => Transaction::PAY_DP,
             };
 
-            // Kurangi stok otomatis + catat stock_histories tipe 'sale'.
-            $this->stockService->deductFromSale($transaction, $user);
-
             $transaction->update([
                 'payment_method' => $payload['payment_method'] ?? 'cash',
                 'payment_status' => $paymentStatus,
@@ -204,13 +211,53 @@ class TransactionService
 
             $fresh = $transaction->refresh();
 
-            // Kas keluar otomatis dari produk luar saat transaksi final.
+            // Kas masuk dari pembayaran yang diterima (DP / lunas).
+            $this->cashService->recordTransactionIncome($fresh, $user, $impersonatedBy);
+
+            // Stok & kas keluar produk luar HANYA saat transaksi FINAL.
+            // Ini mencegah stok terpotong dobel bila checkout sempat dilakukan
+            // sebelum transaksi final (mis. DP/proses lalu dilunasi).
             if ($fresh->isFinal()) {
+                $this->stockService->deductFromSale($fresh, $user);
                 $this->cashService->recordExternalPurchase($fresh, $user, $impersonatedBy);
+                $this->maybeArchive($fresh);
             }
 
             return $fresh;
         });
+    }
+
+    /**
+     * Arsipkan (salin ke CSV) transaksi final tiap kelipatan ARCHIVE_EVERY.
+     * TIDAK menghapus data apa pun — hanya backup read-only (append-only).
+     */
+    private function maybeArchive(Transaction $transaction): void
+    {
+        $count = Transaction::final()->count();
+
+        if ($count === 0 || $count % self::ARCHIVE_EVERY !== 0) {
+            return;
+        }
+
+        $batch = Transaction::with(['details', 'services.shares', 'mechanicShares'])
+            ->final()
+            ->orderByDesc('id')
+            ->limit(self::ARCHIVE_EVERY)
+            ->get();
+
+        if ($batch->isEmpty()) {
+            return;
+        }
+
+        $label = $batch->last()->invoice_number.'_'.$batch->first()->invoice_number;
+        $path = $this->csvExport->writeTransactionsArchive($batch, $label);
+
+        TransactionArchive::create([
+            'archive_path' => $path,
+            'transaction_count' => $batch->count(),
+            'oldest_invoice' => $batch->last()->invoice_number,
+            'newest_invoice' => $batch->first()->invoice_number,
+        ]);
     }
 
     /**

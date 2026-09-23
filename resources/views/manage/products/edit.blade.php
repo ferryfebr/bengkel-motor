@@ -13,7 +13,7 @@
 
                 <div class="flex items-center gap-4">
                     <x-primary-button>{{ __('Perbarui') }}</x-primary-button>
-                    <a href="{{ route('manage.products.index') }}" class="text-sm font-medium text-ink-500 hover:text-ink hover:underline">Batal</a>
+                    <a href="{{ route('manage.products.index') }}" class="btn-secondary">Batal</a>
                 </div>
             </form>
         </div>

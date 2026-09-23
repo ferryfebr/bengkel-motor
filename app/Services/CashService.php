@@ -50,4 +50,32 @@ class CashService
             $impersonatedBy,
         );
     }
+
+    /**
+     * Catat kas masuk dari pembayaran transaksi secara idempoten.
+     *
+     * Karena cash_mutations append-only, hanya selisih terhadap nominal yang
+     * sudah tercatat yang ditambahkan (menangani DP lalu pelunasan).
+     */
+    public function recordTransactionIncome(Transaction $transaction, User $user, ?int $impersonatedBy = null): void
+    {
+        $alreadyIn = (float) CashMutation::where('transaction_id', $transaction->id)
+            ->where('type', CashMutation::TYPE_IN)
+            ->sum('amount');
+
+        $delta = round((float) $transaction->paid_amount - $alreadyIn, 2);
+
+        if ($delta <= 0) {
+            return;
+        }
+
+        $this->record(
+            CashMutation::TYPE_IN,
+            $delta,
+            'Pembayaran transaksi - '.$transaction->invoice_number,
+            $user,
+            $transaction,
+            $impersonatedBy,
+        );
+    }
 }

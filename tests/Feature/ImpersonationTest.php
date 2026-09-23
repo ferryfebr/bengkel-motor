@@ -85,7 +85,7 @@ class ImpersonationTest extends TestCase
         $this->actingAs($owner)->post('/impersonation', ['user_id' => $kasir->id]);
 
         $this->post('/cash', [
-            'type' => 'out',
+            'type' => 'in',
             'amount' => 15000,
             'description' => 'beli alat',
         ])->assertRedirect();

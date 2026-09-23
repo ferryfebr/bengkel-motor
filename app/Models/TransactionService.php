@@ -32,11 +32,6 @@ class TransactionService extends Model
         return $this->belongsTo(Transaction::class);
     }
 
-    public function service(): BelongsTo
-    {
-        return $this->belongsTo(Service::class);
-    }
-
     public function mechanic(): BelongsTo
     {
         return $this->belongsTo(Mechanic::class);

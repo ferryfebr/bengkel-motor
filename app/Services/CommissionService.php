@@ -18,7 +18,7 @@ class CommissionService
      */
     public function split(float $servicePrice, Mechanic|float|null $mechanicOrRatio = null): array
     {
-        $mechanicPercentage = $this->resolveMechanicPercentage($mechanicOrRatio);
+        [$mechanicPercentage, $bengkelPercentage] = $this->resolvePercentages($mechanicOrRatio);
 
         $mechanicFee = round($servicePrice * $mechanicPercentage / 100, 2);
         $bengkelFee = round($servicePrice - $mechanicFee, 2);
@@ -26,21 +26,31 @@ class CommissionService
         return [
             'mechanic_fee' => $mechanicFee,
             'bengkel_fee' => $bengkelFee,
-            'bengkel_percentage' => round(100 - $mechanicPercentage, 2),
+            'bengkel_percentage' => $bengkelPercentage,
         ];
     }
 
-    private function resolveMechanicPercentage(Mechanic|float|null $value): float
+    /**
+     * @return array{0: float, 1: float} [rasio mekanik, rasio bengkel]
+     */
+    private function resolvePercentages(Mechanic|float|null $value): array
     {
         if ($value instanceof Mechanic) {
-            return (float) $value->mechanic_percentage;
+            $mechanic = (float) $value->mechanic_percentage;
+            $bengkel = $value->bengkel_percentage !== null
+                ? (float) $value->bengkel_percentage
+                : round(100 - $mechanic, 2);
+
+            return [$mechanic, $bengkel];
         }
 
         if (is_float($value) || is_int($value)) {
-            return (float) $value;
+            return [(float) $value, round(100 - (float) $value, 2)];
         }
 
-        // Fallback: 100 − rasio bengkel global.
-        return round(100 - Setting::bengkelPercentage(), 2);
+        // Fallback: rasio bengkel global.
+        $bengkel = Setting::bengkelPercentage();
+
+        return [round(100 - $bengkel, 2), $bengkel];
     }
 }

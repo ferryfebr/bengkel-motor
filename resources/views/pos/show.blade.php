@@ -4,7 +4,7 @@
             <h1 class="text-lg font-bold text-ink truncate">
                 POS — {{ $transaction->plate_number }} <span class="font-mono text-xs text-ink-400 font-normal">({{ $transaction->invoice_number }})</span>
             </h1>
-            <a href="{{ route('work-orders.show', $transaction) }}" class="shrink-0 text-sm font-medium text-ink-500 hover:text-ink hover:underline">← Work Order</a>
+            <a href="{{ route('work-orders.show', $transaction) }}" class="btn-secondary shrink-0">← Work Order</a>
         </div>
     </x-slot>
 
@@ -12,7 +12,6 @@
         @include('pos._form', [
             'transaction' => $transaction,
             'products' => $products,
-            'services' => $services,
             'mechanics' => $mechanics,
         ])
     </div>

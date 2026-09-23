@@ -5,7 +5,6 @@ namespace Database\Seeders;
 use App\Models\Category;
 use App\Models\Mechanic;
 use App\Models\Product;
-use App\Models\Service;
 use App\Models\Setting;
 use Illuminate\Database\Seeder;
 
@@ -72,34 +71,6 @@ class MasterDataSeeder extends Seeder
             }
         }
 
-        $services = [
-            ['Servis Ringan / Tune Up', 50000],
-            ['Servis Besar (Turun Mesin)', 350000],
-            ['Ganti Oli Mesin', 20000],
-            ['Ganti Oli Gardan', 20000],
-            ['Ganti Busi', 15000],
-            ['Ganti Filter Udara', 20000],
-            ['Ganti Kampas Rem Depan', 35000],
-            ['Ganti Kampas Rem Belakang', 35000],
-            ['Servis CVT / Ganti V-Belt', 75000],
-            ['Servis Rantai & Gir', 40000],
-            ['Setel Rantai', 15000],
-            ['Tambal Ban', 25000],
-            ['Ganti Ban Luar', 30000],
-            ['Ganti Ban Dalam', 20000],
-            ['Ganti Aki', 25000],
-            ['Servis Kelistrikan', 60000],
-            ['Bongkar Pasang Body', 50000],
-            ['Cuci Motor', 18000],
-        ];
-
-        foreach ($services as [$name, $price]) {
-            Service::updateOrCreate(
-                ['name' => $name],
-                ['price' => $price, 'is_active' => true]
-            );
-        }
-
         $mechanics = [
             ['Andi', 85.00],
             ['Budi', 80.00],
@@ -110,7 +81,11 @@ class MasterDataSeeder extends Seeder
         foreach ($mechanics as [$name, $percentage]) {
             Mechanic::updateOrCreate(
                 ['name' => $name],
-                ['mechanic_percentage' => $percentage, 'is_active' => true]
+                [
+                    'mechanic_percentage' => $percentage,
+                    'bengkel_percentage' => round(100 - $percentage, 2),
+                    'is_active' => true,
+                ]
             );
         }
     }

@@ -71,6 +71,31 @@ class PosDraftTest extends TestCase
         $this->assertDatabaseCount('stock_histories', 0);
     }
 
+    public function test_draft_tetap_tersimpan_walau_belum_dibayar_sama_sekali(): void
+    {
+        $product = $this->makeProduct();
+        $wo = $this->makeWo();
+
+        // Draft murni: tidak ada pembayaran sama sekali, sisa = total.
+        $this->actingAs($this->kasir)->post("/pos/{$wo->id}/draft", [
+            'payment_method' => 'cash',
+            'payment_status' => 'belum_bayar',
+            'work_status' => 'selesai',
+            'products' => [['product_id' => $product->id, 'qty' => 1]],
+        ])->assertRedirect()->assertSessionHas('status');
+
+        $fresh = $wo->fresh();
+        $this->assertSame(1, $fresh->details()->count());
+        $this->assertSame(0.0, (float) $fresh->paid_amount);
+        $this->assertSame(20000.0, $fresh->remainingAmount());
+        $this->assertFalse($fresh->isPaid());
+        $this->assertFalse($fresh->isFinal());
+
+        // Stok belum dipotong karena belum final.
+        $this->assertSame(20, $product->fresh()->stock);
+        $this->assertNull($fresh->finalized_at);
+    }
+
     public function test_draft_bisa_direvisi_dan_dilanjutkan(): void
     {
         $a = $this->makeProduct();

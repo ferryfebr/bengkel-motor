@@ -15,7 +15,6 @@ class RbacTest extends TestCase
         $kasir = User::factory()->kasir()->create();
 
         $this->actingAs($kasir)->get('/manage/mechanics')->assertForbidden();
-        $this->actingAs($kasir)->get('/manage/services')->assertForbidden();
         $this->actingAs($kasir)->get('/manage/categories')->assertForbidden();
     }
 

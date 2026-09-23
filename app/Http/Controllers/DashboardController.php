@@ -3,17 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\CashMutation;
-use App\Models\Product;
 use App\Models\Transaction;
-use App\Services\DataRetentionService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\View\View;
 
 class DashboardController extends Controller
 {
-    public function __construct(private readonly DataRetentionService $retention) {}
-
     /**
      * Tampilkan dashboard sesuai role user yang login.
      */
@@ -28,15 +24,19 @@ class DashboardController extends Controller
             'todayGross' => (float) Transaction::final()
                 ->whereDate('created_at', Carbon::today())
                 ->sum('grand_total'),
-            'lowStock' => Product::query()->lowStock()->count(),
             'cashBalance' => CashMutation::balance(),
+            'externalCashOut' => (float) CashMutation::where('type', CashMutation::TYPE_OUT)
+                ->whereNotNull('transaction_id')
+                ->whereDate('created_at', Carbon::today())
+                ->sum('amount'),
+            'antreCount' => Transaction::where('work_status', Transaction::WORK_ANTRE)->count(),
+            'prosesCount' => Transaction::where('work_status', Transaction::WORK_PROSES)->count(),
+            'queuePreview' => Transaction::whereIn('work_status', [Transaction::WORK_ANTRE, Transaction::WORK_PROSES])
+                ->orderByRaw("CASE work_status WHEN 'proses' THEN 0 ELSE 1 END")
+                ->orderBy('created_at')
+                ->limit(5)
+                ->get(['id', 'plate_number', 'customer_name', 'work_status', 'created_at']),
         ];
-
-        if ($user->hasRole('owner', 'super_admin')) {
-            $data['diskPercent'] = $this->retention->diskUsagePercent();
-            $data['diskWarning'] = $this->retention->diskUsageWarning();
-            $data['finalCount'] = $this->retention->finalTransactionCount();
-        }
 
         $view = match (true) {
             $user->isSuperAdmin() => 'dashboard.super-admin',

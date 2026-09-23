@@ -42,7 +42,12 @@
                     @forelse ($products as $product)
                         <tr class="hover:bg-paper-dim/60 transition-colors">
                             <td class="px-4 py-2.5 font-mono text-xs text-ink-500">{{ $product->code_sku }}</td>
-                            <td class="px-4 py-2.5 text-ink">{{ $product->name }}</td>
+                            <td class="px-4 py-2.5 text-ink">
+                                <span>{{ $product->name }}</span>
+                                @if ($product->stock < 5)
+                                    <span class="badge bg-danger-light text-danger ms-2">⚠️ stok dibawah 5</span>
+                                @endif
+                            </td>
                             <td class="px-4 py-2.5 text-ink-600">{{ $product->category?->name ?? '-' }}</td>
                             @if ($canViewHpp)
                                 <td class="px-4 py-2.5 text-right tabular text-ink-600">
@@ -54,12 +59,12 @@
                                 {{ $product->stock }}
                             </td>
                             <td class="px-4 py-2.5 text-right whitespace-nowrap">
-                                <a href="{{ route('manage.products.edit', $product) }}" class="text-ink font-medium hover:underline">Edit</a>
+                                <a href="{{ route('manage.products.edit', $product) }}" class="btn-secondary px-3">Edit</a>
                                 @can('delete', $product)
                                     <form method="POST" action="{{ route('manage.products.destroy', $product) }}" class="inline"
                                           onsubmit="return confirm('Hapus produk ini?')">
                                         @csrf @method('DELETE')
-                                        <button class="text-danger font-medium hover:underline ms-3">Hapus</button>
+                                        <button class="btn-danger px-3 ms-2">Hapus</button>
                                     </form>
                                 @endcan
                             </td>

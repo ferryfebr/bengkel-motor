@@ -31,7 +31,7 @@ class SavePosDraftRequest extends FormRequest
             'external_products.*.selling_price' => ['required', 'numeric', 'min:0'],
 
             'services' => ['array'],
-            'services.*.service_id' => ['nullable', 'exists:services,id'],
+            'services.*.service_id' => ['nullable', 'integer'],
             'services.*.service_name' => ['required', 'string', 'max:150'],
             'services.*.price' => ['required', 'numeric', 'min:0'],
             'services.*.shares' => ['required', 'array', 'min:1'],
