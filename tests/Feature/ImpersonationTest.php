@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\ActivityLog;
 use App\Models\CashMutation;
 use App\Models\ImpersonationLog;
 use App\Models\Setting;
@@ -123,5 +124,19 @@ class ImpersonationTest extends TestCase
         ])->assertRedirect();
 
         $this->assertNull(Transaction::first()->impersonated_by);
+    }
+
+    public function test_log_impersonate_start_tercatat_atas_nama_admin_asli(): void
+    {
+        $owner = User::factory()->owner()->create();
+        $kasir = User::factory()->kasir()->create();
+
+        $this->actingAs($owner)->post('/impersonation', ['user_id' => $kasir->id]);
+
+        $log = ActivityLog::where('action', 'impersonate start')->first();
+        $this->assertNotNull($log);
+        // Pelaku asli = owner (bukan kasir target).
+        $this->assertSame($owner->id, $log->user_id);
+        $this->assertSame($owner->id, $log->impersonated_by);
     }
 }

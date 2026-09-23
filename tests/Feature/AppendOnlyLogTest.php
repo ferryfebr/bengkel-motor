@@ -5,6 +5,8 @@ namespace Tests\Feature;
 use App\Models\ActivityLog;
 use App\Models\CashMutation;
 use App\Models\ImpersonationLog;
+use App\Models\Mechanic;
+use App\Models\MechanicPayout;
 use App\Models\Product;
 use App\Models\StockHistory;
 use App\Models\User;
@@ -91,6 +93,36 @@ class AppendOnlyLogTest extends TestCase
 
         $this->expectException(RuntimeException::class);
         $mutation->update(['amount' => 99999]);
+    }
+
+    public function test_mechanic_payout_tidak_bisa_diupdate_atau_dihapus(): void
+    {
+        $user = User::factory()->create();
+        $mechanic = Mechanic::create(['name' => 'Andi', 'mechanic_percentage' => 80, 'bengkel_percentage' => 20]);
+
+        $payout = MechanicPayout::create([
+            'mechanic_id' => $mechanic->id,
+            'amount' => 50000,
+            'user_id' => $user->id,
+        ]);
+
+        $this->expectException(RuntimeException::class);
+        $payout->update(['amount' => 1]);
+    }
+
+    public function test_mechanic_payout_tidak_bisa_dihapus(): void
+    {
+        $user = User::factory()->create();
+        $mechanic = Mechanic::create(['name' => 'Andi', 'mechanic_percentage' => 80, 'bengkel_percentage' => 20]);
+
+        $payout = MechanicPayout::create([
+            'mechanic_id' => $mechanic->id,
+            'amount' => 50000,
+            'user_id' => $user->id,
+        ]);
+
+        $this->expectException(RuntimeException::class);
+        $payout->delete();
     }
 
     public function test_impersonation_log_boleh_update_ended_at_saja(): void

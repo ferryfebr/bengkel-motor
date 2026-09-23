@@ -51,4 +51,36 @@ class AuthenticationTest extends TestCase
         $this->assertGuest();
         $response->assertRedirect('/');
     }
+
+    public function test_pesan_login_gagal_dalam_bahasa_indonesia(): void
+    {
+        $user = User::factory()->create(['is_active' => true]);
+
+        $this->from('/login')->post('/login', [
+            'username' => $user->username,
+            'password' => 'salah',
+        ]);
+
+        $this->assertGuest();
+        $this->assertSame('Username atau password salah.', session('errors')->first('username'));
+    }
+
+    public function test_login_dibatasi_setelah_terlalu_banyak_percobaan(): void
+    {
+        $user = User::factory()->create(['is_active' => true]);
+
+        for ($i = 0; $i < 5; $i++) {
+            $this->post('/login', [
+                'username' => $user->username,
+                'password' => 'salah',
+            ]);
+        }
+
+        $response = $this->post('/login', [
+            'username' => $user->username,
+            'password' => 'salah',
+        ]);
+
+        $response->assertStatus(429);
+    }
 }

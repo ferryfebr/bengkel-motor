@@ -24,7 +24,6 @@ class DashboardController extends Controller
             'todayGross' => (float) Transaction::final()
                 ->whereDate('created_at', Carbon::today())
                 ->sum('grand_total'),
-            'cashBalance' => CashMutation::balance(),
             'externalCashOut' => (float) CashMutation::where('type', CashMutation::TYPE_OUT)
                 ->whereNotNull('transaction_id')
                 ->whereDate('created_at', Carbon::today())

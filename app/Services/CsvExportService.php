@@ -4,8 +4,9 @@ namespace App\Services;
 
 use App\Models\ActivityLog;
 use App\Models\Transaction;
+use App\Support\ActivityPresenter;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\LazyCollection;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
@@ -122,7 +123,7 @@ class CsvExportService
         }, $filename, ['Content-Type' => 'text/csv']);
     }
 
-    private function completedQuery(?Carbon $from, ?Carbon $to, string $search): \Illuminate\Database\Eloquent\Builder
+    private function completedQuery(?Carbon $from, ?Carbon $to, string $search): Builder
     {
         return Transaction::query()
             ->where('work_status', Transaction::WORK_SELESAI)
@@ -157,9 +158,9 @@ class CsvExportService
                 fputcsv($out, [
                     optional($log->created_at)->format('d/m/Y H:i'),
                     $log->user?->name ?? '-',
-                    \App\Support\ActivityPresenter::CATEGORIES[\App\Support\ActivityPresenter::category($log->action, $log->model_type)] ?? '-',
-                    \App\Support\ActivityPresenter::label($log->action),
-                    \App\Support\ActivityPresenter::describe($log),
+                    ActivityPresenter::CATEGORIES[ActivityPresenter::category($log->action, $log->model_type)] ?? '-',
+                    ActivityPresenter::label($log->action),
+                    ActivityPresenter::describe($log),
                 ]);
             }
 
@@ -199,68 +200,6 @@ class CsvExportService
     }
 
     /**
-     * Tulis file CSV activity_logs ke arsip, kembalikan path relatif.
-     */
-    public function writeActivityLogsArchive(string $label, ?Carbon $before = null): string
-    {
-        $dir = storage_path('app/'.self::ARCHIVE_DIR);
-        if (! is_dir($dir)) {
-            mkdir($dir, 0755, true);
-        }
-
-        $relative = self::ARCHIVE_DIR.'/activity-logs-'.$label.'.csv';
-        $path = storage_path('app/'.$relative);
-
-        $out = fopen($path, 'w');
-        fputcsv($out, ['id', 'created_at', 'user_id', 'impersonated_by', 'action', 'model_type', 'model_id', 'old_values', 'new_values']);
-
-        $query = ActivityLog::query()->orderBy('id');
-        if ($before) {
-            $query->where('created_at', '<', $before);
-        }
-
-        foreach ($query->lazyById(500) as $log) {
-            fputcsv($out, [
-                $log->id,
-                optional($log->created_at)->toDateTimeString(),
-                $log->user_id,
-                $log->impersonated_by,
-                $log->action,
-                $log->model_type,
-                $log->model_id,
-                json_encode($log->old_values),
-                json_encode($log->new_values),
-            ]);
-        }
-
-        fclose($out);
-
-        return $relative;
-    }
-
-    /**
-     * Baris CSV transaksi, memuat relasi dengan eager loading.
-     *
-     * @return LazyCollection<int, array<int, mixed>>
-     */
-    private function transactionRows(?Carbon $from, ?Carbon $to): LazyCollection
-    {
-        $query = Transaction::with(['details', 'services.shares', 'mechanicShares'])
-            ->where('work_status', Transaction::WORK_SELESAI)
-            ->where('payment_status', Transaction::PAY_LUNAS)
-            ->orderBy('id');
-
-        if ($from) {
-            $query->where('created_at', '>=', $from->copy()->startOfDay());
-        }
-        if ($to) {
-            $query->where('created_at', '<=', $to->copy()->endOfDay());
-        }
-
-        return $query->lazyById(200)->map(fn (Transaction $t) => $this->transactionToRow($t));
-    }
-
-    /**
      * @return array<int, mixed>
      */
     private function transactionToRow(Transaction $transaction): array
@@ -268,7 +207,6 @@ class CsvExportService
         $details = $transaction->details->map(fn ($d) => [
             'name' => $d->is_external ? $d->external_name : optional($d->product)->name,
             'qty' => $d->qty,
-            'purchase_price' => (float) $d->purchase_price,
             'selling_price' => (float) $d->selling_price,
             'line_total' => (float) $d->line_total,
         ])->all();

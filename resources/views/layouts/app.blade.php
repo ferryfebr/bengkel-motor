@@ -23,6 +23,7 @@
             ['route' => 'work-orders.index', 'label' => 'Work Order', 'pattern' => ['work-orders.index', 'work-orders.create', 'work-orders.show', 'work-orders.completed'], 'roles' => ['kasir', 'owner', 'super_admin'], 'icon' => 'clipboard'],
             ['route' => 'work-orders.queue', 'label' => 'Daftar Antrean', 'pattern' => 'work-orders.queue', 'roles' => ['kasir', 'owner', 'super_admin'], 'icon' => 'queue'],
             ['route' => 'cash.index', 'label' => 'Kas Bengkel', 'pattern' => 'cash.*', 'roles' => ['kasir', 'owner', 'super_admin'], 'icon' => 'cash'],
+            ['route' => 'payroll.index', 'label' => 'Gaji Karyawan', 'pattern' => 'payroll.*', 'roles' => ['kasir', 'owner', 'super_admin'], 'icon' => 'payroll'],
             ['route' => 'manage.index', 'label' => 'Manajemen', 'pattern' => 'manage.*', 'roles' => ['kasir', 'owner', 'super_admin'], 'icon' => 'box'],
             ['route' => 'reports.gross', 'label' => 'Laporan', 'pattern' => 'reports.*', 'roles' => ['kasir', 'owner', 'super_admin'], 'icon' => 'chart'],
             ['route' => 'activity.index', 'label' => 'Aktivitas', 'pattern' => 'activity.*', 'roles' => ['owner', 'super_admin'], 'icon' => 'activity'],
@@ -80,6 +81,9 @@
                                         @break
                                     @case('queue')
                                         <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h10"/></svg>
+                                        @break
+                                    @case('payroll')
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v18M8 7h6a2.5 2.5 0 0 1 0 5H9a2.5 2.5 0 0 0 0 5h6"/></svg>
                                         @break
                                     @case('switch')
                                         <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M21 16v3a2 2 0 0 1-2 2h-3M3 8V5a2 2 0 0 1 2-2h3M9 12h6"/></svg>

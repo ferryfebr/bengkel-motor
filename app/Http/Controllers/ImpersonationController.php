@@ -51,17 +51,18 @@ class ImpersonationController extends Controller
         ]);
 
         $target = User::findOrFail($validated['user_id']);
+        $admin = $request->user();
 
         try {
-            $this->impersonation->start($request->user(), $target);
+            $this->impersonation->start($admin, $target);
         } catch (RuntimeException $e) {
             return back()->with('error', $e->getMessage());
         }
 
+        // Catat atas nama ADMIN asli (bukan target), karena Auth sudah beralih ke target.
         $this->activityLog->log('impersonate start', $target, new: [
-            'impersonated_by' => $request->user()->id,
             'target_user_id' => $target->id,
-        ]);
+        ], userId: $admin->id, impersonatedBy: $admin->id);
 
         return redirect()->route('dashboard')
             ->with('status', "Anda masuk sebagai {$target->name}.");

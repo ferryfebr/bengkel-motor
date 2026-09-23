@@ -6,6 +6,7 @@ use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ImpersonationController;
 use App\Http\Controllers\MechanicController;
+use App\Http\Controllers\PayrollController;
 use App\Http\Controllers\PosController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProfileController;
@@ -54,6 +55,13 @@ Route::middleware(['auth', 'track.impersonation'])->group(function () {
         Route::post('pos/{transaction}/draft', [PosController::class, 'saveDraft'])->name('pos.draft');
         Route::post('pos/{transaction}/checkout', [PosController::class, 'checkout'])->name('pos.checkout');
         Route::get('pos/{transaction}/receipt', [PosController::class, 'receipt'])->name('pos.receipt');
+    });
+
+    // Gaji Karyawan (mekanik) - kasir & owner.
+    Route::middleware('role:kasir,owner,super_admin')->prefix('payroll')->name('payroll.')->group(function () {
+        Route::get('/', [PayrollController::class, 'index'])->name('index');
+        Route::get('{mechanic}', [PayrollController::class, 'show'])->name('show');
+        Route::post('{mechanic}/payout', [PayrollController::class, 'payout'])->name('payout');
     });
 
     // Kas Bengkel - kasir boleh input mutasi; owner/super_admin lihat semua.
@@ -108,4 +116,3 @@ Route::middleware(['auth', 'track.impersonation'])->group(function () {
 });
 
 require __DIR__.'/auth.php';
-

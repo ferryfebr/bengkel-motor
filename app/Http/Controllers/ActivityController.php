@@ -4,12 +4,16 @@ namespace App\Http\Controllers;
 
 use App\Models\ActivityLog;
 use App\Models\CashMutation;
+use App\Models\Category;
+use App\Models\Mechanic;
+use App\Models\Product;
 use App\Models\StockHistory;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Support\ActivityPresenter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Carbon;
 use Illuminate\View\View;
 
@@ -53,9 +57,9 @@ class ActivityController extends Controller
                 ->paginate(20)
                 ->withQueryString();
 
-            $logs = new \Illuminate\Pagination\LengthAwarePaginator([], 0, 20);
+            $logs = new LengthAwarePaginator([], 0, 20);
         } else {
-            $transactions = new \Illuminate\Pagination\LengthAwarePaginator([], 0, 20);
+            $transactions = new LengthAwarePaginator([], 0, 20);
 
             $logs = ActivityLog::with('user')
                 ->whereBetween('created_at', [$from, $to])
@@ -169,24 +173,24 @@ class ActivityController extends Controller
     {
         match ($category) {
             'transaksi' => $query->whereIn('action', ['create wo', 'update work_status', 'update draft', 'checkout', 'create external_product']),
-            'kas' => $query->whereIn('action', ['create cash_mutation', 'withdraw cash']),
+            'kas' => $query->whereIn('action', ['create cash_mutation', 'withdraw cash', 'mechanic payout']),
             'akun' => $query->where(function ($q) {
                 $q->whereIn('action', ['create kasir', 'update kasir', 'delete kasir'])
                     ->orWhere('action', 'like', 'impersonate%');
             }),
             'mekanik' => $query->where(function ($q) {
                 $q->where('action', 'update mechanic_ratio')
-                    ->orWhere('model_type', \App\Models\Mechanic::class);
+                    ->orWhere('model_type', Mechanic::class);
             }),
             'produk' => $query->where(function ($q) {
-                $q->whereIn('model_type', [\App\Models\Product::class, \App\Models\Category::class])
+                $q->whereIn('model_type', [Product::class, Category::class])
                     ->orWhereIn('action', ['update stock', 'update product_price', 'update product_hpp']);
             }),
             default => $query->whereNotIn('action', [
                 'create wo', 'update work_status', 'update draft', 'checkout', 'create external_product',
-                'create cash_mutation', 'withdraw cash', 'create kasir', 'update kasir', 'delete kasir',
+                'create cash_mutation', 'withdraw cash', 'mechanic payout', 'create kasir', 'update kasir', 'delete kasir',
                 'update mechanic_ratio', 'update stock', 'update product_price', 'update product_hpp',
-            ])->whereNotIn('model_type', [\App\Models\Product::class, \App\Models\Category::class, \App\Models\Mechanic::class]),
+            ])->whereNotIn('model_type', [Product::class, Category::class, Mechanic::class]),
         };
     }
 

@@ -10,11 +10,13 @@ use App\Models\Transaction;
 use App\Services\ActivityLogService;
 use App\Services\CsvExportService;
 use App\Services\InvoiceService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class WorkOrderController extends Controller
 {
@@ -76,7 +78,7 @@ class WorkOrderController extends Controller
     /**
      * Export CSV transaksi selesai: rincian tiap produk/jasa + total dibayar paling kanan.
      */
-    public function exportCompleted(Request $request): \Symfony\Component\HttpFoundation\StreamedResponse
+    public function exportCompleted(Request $request): StreamedResponse
     {
         [$from, $to] = $this->dateRange($request);
 
@@ -99,7 +101,7 @@ class WorkOrderController extends Controller
         return [$from, $to];
     }
 
-    private function completedQuery(Request $request, Carbon $from, Carbon $to): \Illuminate\Database\Eloquent\Builder
+    private function completedQuery(Request $request, Carbon $from, Carbon $to): Builder
     {
         return Transaction::query()
             ->where('work_status', Transaction::WORK_SELESAI)

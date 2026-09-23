@@ -26,7 +26,7 @@ class ActivityPresenter
         if (in_array($action, ['create wo', 'update work_status', 'update draft', 'checkout', 'create external_product'], true)) {
             return 'transaksi';
         }
-        if (in_array($action, ['create cash_mutation', 'withdraw cash'], true)) {
+        if (in_array($action, ['create cash_mutation', 'withdraw cash', 'mechanic payout'], true)) {
             return 'kas';
         }
         if (in_array($action, ['create kasir', 'update kasir', 'delete kasir'], true)) {
@@ -56,6 +56,7 @@ class ActivityPresenter
             'update product_hpp' => 'Ubah HPP',
             'create cash_mutation' => 'Catat mutasi kas',
             'withdraw cash' => 'Penarikan kas',
+            'mechanic payout' => 'Penarikan gaji mekanik',
             'create kasir' => 'Tambah akun kasir',
             'update kasir' => 'Ubah akun kasir',
             'delete kasir' => 'Hapus akun kasir',
@@ -85,6 +86,7 @@ class ActivityPresenter
             'update product_hpp' => 'Mengubah HPP produk.',
             'create cash_mutation' => self::cash($new),
             'withdraw cash' => 'Menarik kas '.self::money($new['amount'] ?? 0).'.',
+            'mechanic payout' => 'Menarik gaji mekanik sebesar '.self::money($new['amount'] ?? 0).'.',
             'update mechanic_ratio' => 'Mengubah rasio: mekanik '.($new['mechanic_percentage'] ?? '-').'%, bengkel '.($new['bengkel_percentage'] ?? '-').'%.',
             'impersonate start' => 'Memulai "Login Sebagai" user #'.($new['target_user_id'] ?? '-').'.',
             'impersonate end' => 'Mengakhiri "Login Sebagai".',
