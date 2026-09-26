@@ -35,6 +35,8 @@ class CategoryController extends Controller
 
     public function edit(Category $category): View
     {
+        $category->load(['products' => fn ($query) => $query->orderBy('name')]);
+
         return view('manage.categories.edit', compact('category'));
     }
 

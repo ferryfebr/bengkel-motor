@@ -73,6 +73,11 @@ class Transaction extends Model
         return $this->hasMany(TransactionMechanicShare::class);
     }
 
+    public function returns(): HasMany
+    {
+        return $this->hasMany(TransactionReturn::class);
+    }
+
     public function isFinal(): bool
     {
         return $this->work_status === self::WORK_SELESAI

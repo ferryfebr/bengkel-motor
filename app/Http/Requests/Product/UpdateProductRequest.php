@@ -22,8 +22,8 @@ class UpdateProductRequest extends FormRequest
             'code_sku' => ['required', 'string', 'max:50', Rule::unique('products', 'code_sku')->ignore($product->id)],
             'name' => ['required', 'string', 'max:150'],
             'selling_price' => ['required', 'numeric', 'min:0'],
-            'stock' => ['required', 'integer', 'min:0'],
-            'min_stock' => ['nullable', 'integer', 'min:0'],
+            // Stok tidak diubah langsung; pakai "tambah stok" (delta) agar tercatat di stock_histories.
+            'stock_add' => ['nullable', 'integer', 'min:1'],
             'purchase_price' => [
                 Rule::prohibitedIf(fn () => ! $this->user()->can('updateHpp', Product::class)),
                 'nullable',

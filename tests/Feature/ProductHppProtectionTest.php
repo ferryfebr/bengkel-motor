@@ -19,7 +19,6 @@ class ProductHppProtectionTest extends TestCase
             'purchase_price' => 30000,
             'selling_price' => 45000,
             'stock' => 10,
-            'min_stock' => 3,
         ]);
     }
 
@@ -47,23 +46,22 @@ class ProductHppProtectionTest extends TestCase
         $this->assertStringNotContainsString('purchase_price', $response->getContent());
     }
 
-    public function test_kasir_tidak_bisa_mengirim_hpp_saat_membuat_produk(): void
+    public function test_kasir_tidak_bisa_membuat_produk(): void
     {
         $kasir = User::factory()->kasir()->create();
 
-        $response = $this->actingAs($kasir)->post('/manage/products', [
+        $this->actingAs($kasir)->post('/manage/products', [
             'code_sku' => 'HACK-1',
             'name' => 'Produk Curang',
             'selling_price' => 10000,
             'stock' => 1,
             'purchase_price' => 5000,
-        ]);
+        ])->assertForbidden();
 
-        $response->assertSessionHasErrors('purchase_price');
         $this->assertDatabaseMissing('products', ['code_sku' => 'HACK-1']);
     }
 
-    public function test_kasir_bisa_update_stok_dan_harga_jual_tanpa_mengubah_hpp(): void
+    public function test_kasir_tidak_bisa_update_produk(): void
     {
         $product = $this->makeProduct();
         $kasir = User::factory()->kasir()->create();
@@ -73,13 +71,12 @@ class ProductHppProtectionTest extends TestCase
             'name' => 'Oli Test',
             'selling_price' => 47000,
             'stock' => 20,
-            'min_stock' => 3,
-        ])->assertRedirect('/manage/products');
+        ])->assertForbidden();
 
         $product->refresh();
-        $this->assertEquals(47000, (float) $product->selling_price);
-        $this->assertEquals(20, $product->stock);
-        // HPP tidak boleh berubah / terhapus.
+        // Tidak ada perubahan apa pun.
+        $this->assertEquals(45000, (float) $product->selling_price);
+        $this->assertEquals(10, $product->stock);
         $this->assertEquals(30000, (float) $product->purchase_price);
     }
 
@@ -98,6 +95,28 @@ class ProductHppProtectionTest extends TestCase
         $this->assertDatabaseHas('products', [
             'code_sku' => 'OLI-002',
             'purchase_price' => 35000,
+        ]);
+    }
+
+    public function test_tambah_stok_menambah_bukan_menimpa(): void
+    {
+        $product = $this->makeProduct(); // stok awal 10
+        $owner = User::factory()->owner()->create();
+
+        $this->actingAs($owner)->put("/manage/products/{$product->id}", [
+            'code_sku' => 'OLI-001',
+            'name' => 'Oli Test',
+            'selling_price' => 45000,
+            'stock_add' => 15,
+        ])->assertRedirect('/manage/products');
+
+        $product->refresh();
+        // 10 + 15 = 25 (bukan ditimpa jadi 15).
+        $this->assertSame(25, $product->stock);
+        $this->assertDatabaseHas('stock_histories', [
+            'product_id' => $product->id,
+            'type' => 'in',
+            'qty_change' => 15,
         ]);
     }
 }

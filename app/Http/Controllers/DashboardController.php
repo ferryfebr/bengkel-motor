@@ -24,10 +24,15 @@ class DashboardController extends Controller
             'todayGross' => (float) Transaction::final()
                 ->whereDate('created_at', Carbon::today())
                 ->sum('grand_total'),
-            'externalCashOut' => (float) CashMutation::where('type', CashMutation::TYPE_OUT)
-                ->whereNotNull('transaction_id')
+            // Semua kas keluar hari ini (manual, gaji, produk luar, refund) + rincian per kategori.
+            'cashOutToday' => (float) CashMutation::where('type', CashMutation::TYPE_OUT)
                 ->whereDate('created_at', Carbon::today())
                 ->sum('amount'),
+            'cashOutBreakdown' => CashMutation::where('type', CashMutation::TYPE_OUT)
+                ->whereDate('created_at', Carbon::today())
+                ->selectRaw('category, SUM(amount) as total')
+                ->groupBy('category')
+                ->pluck('total', 'category'),
             'antreCount' => Transaction::where('work_status', Transaction::WORK_ANTRE)->count(),
             'prosesCount' => Transaction::where('work_status', Transaction::WORK_PROSES)->count(),
             'queuePreview' => Transaction::whereIn('work_status', [Transaction::WORK_ANTRE, Transaction::WORK_PROSES])

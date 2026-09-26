@@ -17,11 +17,13 @@
         <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
             <x-stat-card label="Gaji Terkumpul (Periode)" value="Rp {{ number_format($earned, 0, ',', '.') }}" />
             <x-stat-card label="Gaji Terkumpul (Keseluruhan)" value="Rp {{ number_format($earnedAll, 0, ',', '.') }}" />
-            <x-stat-card label="Total Ditarik" value="Rp {{ number_format($withdrawn, 0, ',', '.') }}" />
-            <x-stat-card label="Saldo Gaji" value="Rp {{ number_format($balance, 0, ',', '.') }}" :tone="$balance < 0 ? 'danger' : 'success'" />
+            @if ($canViewPayouts)
+                <x-stat-card label="Total Ditarik" value="Rp {{ number_format($withdrawn, 0, ',', '.') }}" />
+                <x-stat-card label="Saldo Gaji" value="Rp {{ number_format($balance, 0, ',', '.') }}" :tone="$balance < 0 ? 'danger' : 'success'" />
+            @endif
         </div>
 
-        @if ($balance < 0)
+        @if ($canViewPayouts && $balance < 0)
             <div class="bg-danger-light border border-danger/40 text-danger px-4 py-3 rounded-md text-sm font-medium">
                 Saldo gaji minus Rp {{ number_format(abs($balance), 0, ',', '.') }} (kasbon / hutang mekanik ke bengkel).
             </div>
@@ -65,7 +67,7 @@
             </form>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 {{ $canViewPayouts ? 'lg:grid-cols-2' : '' }} gap-4">
             {{-- Rincian komisi --}}
             <div class="bg-white border border-line rounded-md overflow-hidden">
                 <div class="px-4 py-3 border-b border-line font-semibold text-ink">Rincian Komisi (Periode)</div>
@@ -99,32 +101,34 @@
                 </table>
             </div>
 
-            {{-- Riwayat penarikan --}}
-            <div class="bg-white border border-line rounded-md overflow-hidden">
-                <div class="px-4 py-3 border-b border-line font-semibold text-ink">Riwayat Penarikan Gaji</div>
-                <table class="min-w-full font-condensed text-sm">
-                    <thead class="bg-paper-dim text-ink">
-                        <tr>
-                            <th class="px-4 py-3 text-left font-semibold">Tanggal</th>
-                            <th class="px-4 py-3 text-left font-semibold">Keterangan</th>
-                            <th class="px-4 py-3 text-left font-semibold">Oleh</th>
-                            <th class="px-4 py-3 text-right font-semibold">Nominal</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-line">
-                        @forelse ($payouts as $p)
-                            <tr class="hover:bg-paper-dim/60 transition-colors">
-                                <td class="px-4 py-2.5 text-ink-600 whitespace-nowrap">{{ $p->created_at->format('d/m/Y H:i') }}</td>
-                                <td class="px-4 py-2.5 text-ink-700">{{ $p->description ?: '-' }}</td>
-                                <td class="px-4 py-2.5 text-ink-500">{{ $p->user?->name }}</td>
-                                <td class="px-4 py-2.5 text-right tabular text-danger">Rp {{ number_format($p->amount, 0, ',', '.') }}</td>
+            {{-- Riwayat penarikan (hanya owner/super_admin) --}}
+            @if ($canViewPayouts)
+                <div class="bg-white border border-line rounded-md overflow-hidden">
+                    <div class="px-4 py-3 border-b border-line font-semibold text-ink">Riwayat Penarikan Gaji</div>
+                    <table class="min-w-full font-condensed text-sm">
+                        <thead class="bg-paper-dim text-ink">
+                            <tr>
+                                <th class="px-4 py-3 text-left font-semibold">Tanggal</th>
+                                <th class="px-4 py-3 text-left font-semibold">Keterangan</th>
+                                <th class="px-4 py-3 text-left font-semibold">Oleh</th>
+                                <th class="px-4 py-3 text-right font-semibold">Nominal</th>
                             </tr>
-                        @empty
-                            <tr><td colspan="4" class="px-4 py-8 text-center text-ink-400">Belum ada penarikan.</td></tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
+                        </thead>
+                        <tbody class="divide-y divide-line">
+                            @forelse ($payouts as $p)
+                                <tr class="hover:bg-paper-dim/60 transition-colors">
+                                    <td class="px-4 py-2.5 text-ink-600 whitespace-nowrap">{{ $p->created_at->format('d/m/Y H:i') }}</td>
+                                    <td class="px-4 py-2.5 text-ink-700">{{ $p->description ?: '-' }}</td>
+                                    <td class="px-4 py-2.5 text-ink-500">{{ $p->user?->name }}</td>
+                                    <td class="px-4 py-2.5 text-right tabular text-danger">Rp {{ number_format($p->amount, 0, ',', '.') }}</td>
+                                </tr>
+                            @empty
+                                <tr><td colspan="4" class="px-4 py-8 text-center text-ink-400">Belum ada penarikan.</td></tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            @endif
         </div>
     </div>
 

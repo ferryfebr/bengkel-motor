@@ -12,7 +12,23 @@
         <div class="grid grid-cols-2 lg:grid-cols-3 gap-4">
             <x-stat-card label="Omset Hari Ini" value="Rp {{ number_format($todayGross, 0, ',', '.') }}" tone="success" />
             <x-stat-card label="Transaksi Hari Ini" :value="number_format($todayTransactions)" />
-            <x-stat-card label="Pengeluaran Kas Produk Luar (Hari Ini)" value="Rp {{ number_format($externalCashOut, 0, ',', '.') }}" />
+            <div class="bg-white border border-line rounded-md p-5">
+                <div class="text-[13px] font-medium text-ink-500">Kas Keluar Hari Ini</div>
+                <div class="font-num tabular text-2xl font-bold text-danger mt-2">Rp {{ number_format($cashOutToday, 0, ',', '.') }}</div>
+                @if ($cashOutBreakdown->isNotEmpty())
+                    <div class="text-xs text-ink-500 mt-2 space-y-0.5">
+                        @foreach (\App\Models\CashMutation::categoryLabels() as $key => $label)
+                            @if (($cashOutBreakdown[$key] ?? 0) > 0)
+                                <div class="flex justify-between gap-2">
+                                    <span>{{ $label }}</span>
+                                    <span class="tabular">Rp {{ number_format($cashOutBreakdown[$key], 0, ',', '.') }}</span>
+                                </div>
+                            @endif
+                        @endforeach
+                    </div>
+                @endif
+                <a href="{{ route('cash.index', ['period' => 'today', 'type' => 'out']) }}" class="inline-block text-xs font-semibold text-signal mt-2 hover:underline">Lihat rincian kas keluar →</a>
+            </div>
         </div>
 
         <div class="bg-paper border border-line rounded-md p-6">

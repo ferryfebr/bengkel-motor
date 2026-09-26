@@ -26,9 +26,11 @@
             <x-primary-button>Tampilkan</x-primary-button>
         </form>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 {{ $canViewPayouts ? 'md:grid-cols-2' : '' }} gap-4">
             <x-stat-card label="Total Gaji Terkumpul (Periode)" value="Rp {{ number_format($totalEarned, 0, ',', '.') }}" />
-            <x-stat-card label="Total Saldo Gaji (Keseluruhan)" value="Rp {{ number_format($totalBalance, 0, ',', '.') }}" :tone="$totalBalance < 0 ? 'danger' : 'default'" />
+            @if ($canViewPayouts)
+                <x-stat-card label="Total Saldo Gaji (Keseluruhan)" value="Rp {{ number_format($totalBalance, 0, ',', '.') }}" :tone="$totalBalance < 0 ? 'danger' : 'default'" />
+            @endif
         </div>
 
         <div class="bg-white border border-line rounded-md overflow-x-auto">
@@ -37,8 +39,10 @@
                     <tr>
                         <th class="px-4 py-3 text-left font-semibold">Mekanik</th>
                         <th class="px-4 py-3 text-right font-semibold">Gaji Terkumpul (Periode)</th>
-                        <th class="px-4 py-3 text-right font-semibold">Total Ditarik</th>
-                        <th class="px-4 py-3 text-right font-semibold">Saldo Gaji</th>
+                        @if ($canViewPayouts)
+                            <th class="px-4 py-3 text-right font-semibold">Total Ditarik</th>
+                            <th class="px-4 py-3 text-right font-semibold">Saldo Gaji</th>
+                        @endif
                         <th class="px-4 py-3 text-right font-semibold">Aksi</th>
                     </tr>
                 </thead>
@@ -47,14 +51,16 @@
                         <tr class="hover:bg-paper-dim/60 transition-colors">
                             <td class="px-4 py-2.5 font-semibold text-ink">{{ $row['mechanic']->name }}</td>
                             <td class="px-4 py-2.5 text-right tabular text-ink">Rp {{ number_format($row['earned'], 0, ',', '.') }}</td>
-                            <td class="px-4 py-2.5 text-right tabular text-ink-600">Rp {{ number_format($row['withdrawn'], 0, ',', '.') }}</td>
-                            <td class="px-4 py-2.5 text-right tabular font-semibold {{ $row['balance'] < 0 ? 'text-danger' : 'text-ink' }}">Rp {{ number_format($row['balance'], 0, ',', '.') }}</td>
+                            @if ($canViewPayouts)
+                                <td class="px-4 py-2.5 text-right tabular text-ink-600">Rp {{ number_format($row['withdrawn'], 0, ',', '.') }}</td>
+                                <td class="px-4 py-2.5 text-right tabular font-semibold {{ $row['balance'] < 0 ? 'text-danger' : 'text-ink' }}">Rp {{ number_format($row['balance'], 0, ',', '.') }}</td>
+                            @endif
                             <td class="px-4 py-2.5 text-right whitespace-nowrap">
                                 <a href="{{ route('payroll.show', ['mechanic' => $row['mechanic'], 'from' => $from->toDateString(), 'to' => $to->toDateString()]) }}" class="btn-secondary px-3">Lihat &amp; Ambil Gaji</a>
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="5" class="px-4 py-10 text-center text-ink-400">Belum ada mekanik.</td></tr>
+                        <tr><td colspan="{{ $canViewPayouts ? 5 : 3 }}" class="px-4 py-10 text-center text-ink-400">Belum ada mekanik.</td></tr>
                     @endforelse
                 </tbody>
             </table>

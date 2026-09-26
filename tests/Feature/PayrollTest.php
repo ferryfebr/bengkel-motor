@@ -113,4 +113,45 @@ class PayrollTest extends TestCase
 
         $this->assertSame(20000.0, (float) MechanicPayout::first()->amount);
     }
+
+    public function test_kasir_tidak_melihat_riwayat_penarikan_gaji(): void
+    {
+        $mechanic = $this->mechanicWithCommission(share: 100000);
+
+        $this->actingAs($this->kasir)->post("/payroll/{$mechanic->id}/payout", [
+            'amount' => '20000',
+            'description' => 'RAHASIA-XYZ',
+        ])->assertRedirect();
+
+        // Kasir tidak melihat riwayat penarikan (tapi tetap bisa mencatat).
+        $this->actingAs($this->kasir)->get("/payroll/{$mechanic->id}")
+            ->assertOk()
+            ->assertDontSee('Riwayat Penarikan Gaji')
+            ->assertDontSee('RAHASIA-XYZ')
+            ->assertDontSee('Total Ditarik')
+            ->assertDontSee('Saldo Gaji');
+
+        // Owner tetap melihat riwayatnya.
+        $owner = User::factory()->owner()->create();
+        $this->actingAs($owner)->get("/payroll/{$mechanic->id}")
+            ->assertOk()
+            ->assertSee('Riwayat Penarikan Gaji')
+            ->assertSee('RAHASIA-XYZ');
+    }
+
+    public function test_kasir_tidak_melihat_kolom_penarikan_di_rekap_gaji(): void
+    {
+        $this->mechanicWithCommission();
+
+        $this->actingAs($this->kasir)->get('/payroll')
+            ->assertOk()
+            ->assertDontSee('Total Ditarik')
+            ->assertDontSee('Saldo Gaji');
+
+        $owner = User::factory()->owner()->create();
+        $this->actingAs($owner)->get('/payroll')
+            ->assertOk()
+            ->assertSee('Total Ditarik')
+            ->assertSee('Saldo Gaji');
+    }
 }

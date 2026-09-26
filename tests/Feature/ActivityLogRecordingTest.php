@@ -23,7 +23,6 @@ class ActivityLogRecordingTest extends TestCase
             'purchase_price' => $hpp,
             'selling_price' => $sell,
             'stock' => 10,
-            'min_stock' => 1,
         ]);
     }
 
@@ -50,18 +49,17 @@ class ActivityLogRecordingTest extends TestCase
         $this->assertEquals(35000, $log->new_values['purchase_price']);
     }
 
-    public function test_hpp_tidak_bocor_ke_activity_log_saat_kasir_update_produk(): void
+    public function test_update_produk_tanpa_hpp_tidak_membocorkan_hpp_ke_activity_log(): void
     {
         $product = $this->makeProduct();
-        $kasir = User::factory()->kasir()->create();
+        $owner = User::factory()->owner()->create();
 
-        // Kasir ubah stok & harga jual (tanpa HPP).
-        $this->actingAs($kasir)->put("/manage/products/{$product->id}", [
+        // Owner ubah stok (tambah) & harga jual (tanpa menyentuh HPP).
+        $this->actingAs($owner)->put("/manage/products/{$product->id}", [
             'code_sku' => $product->code_sku,
             'name' => $product->name,
             'selling_price' => 47000,
-            'stock' => 20,
-            'min_stock' => 1,
+            'stock_add' => 10,
         ])->assertRedirect('/manage/products');
 
         // Tidak ada nilai HPP di manapun pada activity_logs.
@@ -74,6 +72,19 @@ class ActivityLogRecordingTest extends TestCase
         $this->assertDatabaseHas('activity_logs', ['action' => 'update product_price']);
     }
 
+    public function test_kasir_tidak_bisa_update_produk(): void
+    {
+        $product = $this->makeProduct();
+        $kasir = User::factory()->kasir()->create();
+
+        $this->actingAs($kasir)->put("/manage/products/{$product->id}", [
+            'code_sku' => $product->code_sku,
+            'name' => $product->name,
+            'selling_price' => 47000,
+            'stock' => 20,
+        ])->assertForbidden();
+    }
+
     public function test_owner_ubah_hpp_tercatat_sebagai_update_product_hpp(): void
     {
         $product = $this->makeProduct(hpp: 30000);
@@ -84,7 +95,6 @@ class ActivityLogRecordingTest extends TestCase
             'name' => $product->name,
             'selling_price' => (float) $product->selling_price,
             'stock' => $product->stock,
-            'min_stock' => 1,
             'purchase_price' => 28000,
         ])->assertRedirect('/manage/products');
 

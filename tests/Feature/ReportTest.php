@@ -35,7 +35,6 @@ class ReportTest extends TestCase
             'purchase_price' => $hpp,
             'selling_price' => $sell,
             'stock' => 50,
-            'min_stock' => 1,
         ]);
     }
 

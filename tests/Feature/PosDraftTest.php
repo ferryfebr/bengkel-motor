@@ -43,7 +43,6 @@ class PosDraftTest extends TestCase
             'purchase_price' => 10000,
             'selling_price' => 20000,
             'stock' => 20,
-            'min_stock' => 1,
         ]);
     }
 

@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\Cash\StoreCashMutationRequest;
-use App\Http\Requests\Cash\WithdrawCashRequest;
 use App\Models\CashMutation;
 use App\Services\ActivityLogService;
 use App\Services\CashService;
@@ -35,6 +34,9 @@ class CashController extends Controller
             ->when($request->filled('type') && $request->type !== 'semua', function ($query) use ($request) {
                 $query->where('type', $request->string('type'));
             })
+            ->when($request->filled('category') && $request->category !== 'semua', function ($query) use ($request) {
+                $query->where('category', $request->string('category'));
+            })
             ->orderByDesc('created_at')
             ->orderByDesc('id')
             ->paginate(20)
@@ -50,6 +52,8 @@ class CashController extends Controller
             'balance' => $balance,
             'balanceAllTime' => CashMutation::balance(),
             'typeFilter' => $request->string('type')->toString() ?: 'semua',
+            'categoryFilter' => $request->string('category')->toString() ?: 'semua',
+            'categoryLabels' => CashMutation::categoryLabels(),
             'from' => $from,
             'to' => $to,
             'isManager' => $isManager,
@@ -73,29 +77,6 @@ class CashController extends Controller
         ]));
 
         return redirect()->route('cash.index')->with('status', 'Mutasi kas dicatat.');
-    }
-
-    /**
-     * Penarikan kas oleh owner. Dicatat sebagai kas keluar.
-     */
-    public function withdraw(WithdrawCashRequest $request): RedirectResponse
-    {
-        $description = trim('Penarikan owner'.($request->filled('description') ? ' - '.$request->input('description') : ''));
-
-        $mutation = $this->cashService->record(
-            CashMutation::TYPE_OUT,
-            (float) $request->input('amount'),
-            $description,
-            $request->user(),
-            null,
-            $request->attributes->get('impersonated_by'),
-        );
-
-        $this->activityLog->log('withdraw cash', $mutation, new: $mutation->only([
-            'type', 'amount', 'description',
-        ]));
-
-        return redirect()->route('cash.index')->with('status', 'Penarikan kas berhasil dicatat.');
     }
 
     /**

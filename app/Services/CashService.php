@@ -15,11 +15,13 @@ class CashService
         User $user,
         ?Transaction $transaction = null,
         ?int $impersonatedBy = null,
+        string $category = CashMutation::CATEGORY_MANUAL,
     ): CashMutation {
         return CashMutation::create([
             'type' => $type,
             'amount' => $amount,
             'description' => $description,
+            'category' => $category,
             'transaction_id' => $transaction?->id,
             'user_id' => $user->id,
             'impersonated_by' => $impersonatedBy,
@@ -48,6 +50,7 @@ class CashService
             $user,
             $transaction,
             $impersonatedBy,
+            CashMutation::CATEGORY_EXTERNAL_PRODUCT,
         );
     }
 
@@ -76,6 +79,7 @@ class CashService
             $user,
             $transaction,
             $impersonatedBy,
+            CashMutation::CATEGORY_TRANSACTION_INCOME,
         );
     }
 }

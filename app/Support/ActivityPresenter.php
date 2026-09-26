@@ -15,7 +15,7 @@ class ActivityPresenter
         'mekanik' => 'Mekanik',
         'kas' => 'Kas',
         'akun' => 'Akun & Login',
-        'sistem' => 'Sistem',
+        'sistem' => 'Lainnya',
     ];
 
     public static function category(string $action, ?string $modelType): string

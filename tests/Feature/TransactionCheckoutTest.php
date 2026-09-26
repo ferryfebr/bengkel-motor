@@ -43,7 +43,6 @@ class TransactionCheckoutTest extends TestCase
             'purchase_price' => $hpp,
             'selling_price' => $sell,
             'stock' => $stock,
-            'min_stock' => 1,
         ]);
     }
 

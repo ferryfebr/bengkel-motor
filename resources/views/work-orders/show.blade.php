@@ -106,6 +106,85 @@
             </div>
         @endif
 
+        {{-- Refund produk stok (hanya transaksi final) --}}
+        @if ($transaction->isFinal())
+            <div class="bg-paper border border-line rounded-md p-6">
+                <h3 class="font-semibold text-ink mb-1">Refund / Retur Produk</h3>
+                <p class="text-xs text-ink-500 mb-3">Hanya produk stok bengkel yang bisa direfund. Produk luar &amp; jasa tidak bisa.</p>
+
+                @php
+                    $refundableDetails = $transaction->details->filter(fn ($d) => $d->refundableQty() > 0);
+                @endphp
+
+                @if ($refundableDetails->isNotEmpty())
+                    <form method="POST" action="{{ route('work-orders.refund', $transaction) }}" class="space-y-4"
+                          onsubmit="return confirm('Proses refund ini? Stok & kas akan disesuaikan.');">
+                        @csrf
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full font-condensed text-sm">
+                                <thead class="bg-paper-dim text-ink">
+                                    <tr>
+                                        <th class="px-4 py-2 text-left font-semibold">Produk</th>
+                                        <th class="px-4 py-2 text-right font-semibold">Harga</th>
+                                        <th class="px-4 py-2 text-right font-semibold">Dibeli</th>
+                                        <th class="px-4 py-2 text-right font-semibold">Sudah Refund</th>
+                                        <th class="px-4 py-2 text-right font-semibold">Qty Refund</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-line">
+                                    @foreach ($refundableDetails as $d)
+                                        <tr>
+                                            <td class="px-4 py-2 text-ink">{{ $d->displayName() }}</td>
+                                            <td class="px-4 py-2 text-right tabular text-ink-600">{{ number_format($d->selling_price, 0, ',', '.') }}</td>
+                                            <td class="px-4 py-2 text-right tabular text-ink-600">{{ $d->qty }}</td>
+                                            <td class="px-4 py-2 text-right tabular text-ink-600">{{ $d->refundedQty() }}</td>
+                                            <td class="px-4 py-2 text-right">
+                                                <input type="hidden" name="items[{{ $loop->index }}][transaction_detail_id]" value="{{ $d->id }}">
+                                                <input type="number" name="items[{{ $loop->index }}][qty]" min="0" max="{{ $d->refundableQty() }}" value="0"
+                                                       class="w-24 text-right border-line focus:border-signal focus:ring-signal rounded-md min-h-[40px]" />
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div>
+                            <x-input-label for="reason" value="Alasan Refund (opsional)" />
+                            <x-text-input id="reason" name="reason" type="text" class="mt-1 block w-full"
+                                          :value="old('reason')" placeholder="mis. barang tidak cocok / rusak" />
+                        </div>
+
+                        <x-primary-button>Proses Refund</x-primary-button>
+                    </form>
+                @else
+                    <p class="text-sm text-ink-400">Tidak ada produk stok yang bisa direfund (semua sudah direfund atau transaksi tanpa produk stok).</p>
+                @endif
+
+                @if ($transaction->returns->isNotEmpty())
+                    <div class="mt-5">
+                        <h4 class="font-semibold text-ink mb-2 text-sm">Riwayat Refund</h4>
+                        @foreach ($transaction->returns as $ret)
+                            <div class="border border-danger/40 bg-danger-light/40 rounded-md p-3 mb-2">
+                                <div class="flex flex-wrap justify-between gap-2 text-sm">
+                                    <span class="text-ink-700">{{ $ret->created_at->format('d/m/Y H:i') }} · {{ $ret->user?->name }}</span>
+                                    <span class="font-semibold text-danger">Rp {{ number_format($ret->total, 0, ',', '.') }}</span>
+                                </div>
+                                <ul class="text-xs text-ink-600 mt-1 space-y-0.5">
+                                    @foreach ($ret->items as $it)
+                                        <li>{{ $it->product?->name ?? 'Produk' }} × {{ $it->qty }} — Rp {{ number_format($it->line_total, 0, ',', '.') }}</li>
+                                    @endforeach
+                                </ul>
+                                @if ($ret->reason)
+                                    <div class="text-xs text-ink-500 mt-1">Alasan: {{ $ret->reason }}</div>
+                                @endif
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
+            </div>
+        @endif
+
         {{-- Form POS langsung tampil untuk transaksi yang belum final --}}
         @if (! $transaction->isFinal())
             <div class="bg-paper border border-line rounded-md p-6">

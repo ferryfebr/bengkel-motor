@@ -75,36 +75,25 @@
             </form>
         </div>
 
-        @if (auth()->user()->hasRole('owner', 'super_admin'))
-            <div class="bg-white border border-line rounded-md p-4">
-                <h3 class="font-semibold text-ink mb-1">Penarikan Kas</h3>
-                <p class="text-xs text-ink-500 mb-3">Tarik sebagian uang kas bengkel. Tidak boleh melebihi saldo.</p>
-                <form method="POST" action="{{ route('cash.withdraw') }}" class="flex flex-wrap items-end gap-2">
-                    @csrf
-                    <div>
-                        <x-input-label for="w_amount" value="Nominal Penarikan (Rp)" />
-                        <input id="w_amount" name="amount" type="text" inputmode="numeric" data-rupiah placeholder="0"
-                               class="mt-1 block w-48 border-line focus:border-signal focus:ring-signal rounded-md min-h-[44px]" required />
-                    </div>
-                    <div class="flex-1 min-w-[200px]">
-                        <x-input-label for="w_description" value="Keterangan (opsional)" />
-                        <x-text-input id="w_description" name="description" type="text" class="mt-1 block w-full" placeholder="mis. setoran pemilik" />
-                    </div>
-                    <x-primary-button>Tarik Kas</x-primary-button>
-                </form>
-            </div>
-        @endif
-
-        <form method="GET" class="flex items-end gap-2">
+        <form method="GET" class="flex flex-wrap items-end gap-2">
             @if ($isManager)
                 <input type="hidden" name="from" value="{{ $from->toDateString() }}">
                 <input type="hidden" name="to" value="{{ $to->toDateString() }}">
             @endif
             <div>
-                <x-input-label for="typef" value="Filter" />
+                <x-input-label for="typef" value="Jenis" />
                 <select id="typef" name="type" class="mt-1 border-line focus:border-signal focus:ring-signal rounded-md min-h-[44px]" onchange="this.form.submit()">
                     @foreach (['semua' => 'Semua', 'in' => 'Masuk', 'out' => 'Keluar'] as $val => $label)
                         <option value="{{ $val }}" @selected($typeFilter === $val)>{{ $label }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div>
+                <x-input-label for="catf" value="Kategori" />
+                <select id="catf" name="category" class="mt-1 border-line focus:border-signal focus:ring-signal rounded-md min-h-[44px]" onchange="this.form.submit()">
+                    <option value="semua" @selected($categoryFilter === 'semua')>Semua Kategori</option>
+                    @foreach ($categoryLabels as $val => $label)
+                        <option value="{{ $val }}" @selected($categoryFilter === $val)>{{ $label }}</option>
                     @endforeach
                 </select>
             </div>
@@ -116,6 +105,7 @@
                     <tr>
                         <th class="px-4 py-3 text-left font-semibold">Waktu</th>
                         <th class="px-4 py-3 text-left font-semibold">Jenis</th>
+                        <th class="px-4 py-3 text-left font-semibold">Kategori</th>
                         <th class="px-4 py-3 text-right font-semibold">Nominal</th>
                         <th class="px-4 py-3 text-left font-semibold">Keterangan</th>
                         <th class="px-4 py-3 text-left font-semibold">Oleh</th>
@@ -132,12 +122,13 @@
                                     <span class="badge bg-danger-light text-danger">⛔ Keluar</span>
                                 @endif
                             </td>
+                            <td class="px-4 py-2.5 text-ink-600">{{ $m->categoryLabel() }}</td>
                             <td class="px-4 py-2.5 text-right tabular text-ink">{{ number_format($m->amount, 0, ',', '.') }}</td>
                             <td class="px-4 py-2.5 text-ink-700">{{ $m->description }}</td>
                             <td class="px-4 py-2.5 text-ink-500">{{ $m->user?->name }}</td>
                         </tr>
                     @empty
-                        <tr><td colspan="5" class="px-4 py-10 text-center text-ink-400">Belum ada mutasi kas.</td></tr>
+                        <tr><td colspan="6" class="px-4 py-10 text-center text-ink-400">Belum ada mutasi kas.</td></tr>
                     @endforelse
                 </tbody>
             </table>

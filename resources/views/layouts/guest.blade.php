@@ -5,7 +5,11 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="csrf-token" content="{{ csrf_token() }}">
 
-        <title>{{ config('app.name', 'Laravel') }}</title>
+        <title>{{ config('app.name', 'One Nine Nine') }}</title>
+
+        <!-- Favicon -->
+        <link rel="icon" type="image/png" href="{{ asset('images/logo.JPEG') }}">
+        <link rel="apple-touch-icon" href="{{ asset('images/logo.JPEG') }}">
 
         <!-- Fonts -->
         <link rel="preconnect" href="https://fonts.bunny.net">
@@ -17,9 +21,11 @@
     <body class="font-sans text-ink antialiased">
         <div class="min-h-screen flex flex-col sm:justify-center items-center pt-6 sm:pt-0 bg-paper-dim">
             <div class="flex flex-col items-center">
-                <span class="flex items-center justify-center w-16 h-16 rounded-md bg-ink text-signal font-black text-3xl">B</span>
+                <span class="flex items-center justify-center w-16 h-16 rounded-md bg-white border border-line overflow-hidden">
+                    <img src="{{ asset('images/logo.JPEG') }}" alt="One Nine Nine" class="w-full h-full object-contain">
+                </span>
                 <div class="mt-3 text-center">
-                    <div class="font-bold text-ink text-lg leading-tight">Bengkel Motor</div>
+                    <div class="font-bold text-ink text-lg leading-tight">One Nine Nine</div>
                     <div class="text-[11px] tracking-[0.2em] text-ink-500">Point of Sale</div>
                 </div>
             </div>

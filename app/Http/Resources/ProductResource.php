@@ -24,7 +24,6 @@ class ProductResource extends JsonResource
             'name' => $this->name,
             'selling_price' => (float) $this->selling_price,
             'stock' => $this->stock,
-            'min_stock' => $this->min_stock,
             'purchase_price' => $this->when(
                 $request->user()?->can('viewHpp', Product::class),
                 fn () => $this->purchase_price !== null ? (float) $this->purchase_price : null

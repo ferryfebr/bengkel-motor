@@ -42,7 +42,6 @@ class ActivityPageTest extends TestCase
             'purchase_price' => 10000,
             'selling_price' => 45000,
             'stock' => 10,
-            'min_stock' => 1,
         ]);
 
         $this->actingAs($this->kasir)->post('/work-orders', [

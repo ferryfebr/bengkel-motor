@@ -46,6 +46,7 @@ Route::middleware(['auth', 'track.impersonation'])->group(function () {
         Route::get('work-orders/create', [WorkOrderController::class, 'create'])->name('work-orders.create');
         Route::post('work-orders', [WorkOrderController::class, 'store'])->name('work-orders.store');
         Route::get('work-orders/{workOrder}', [WorkOrderController::class, 'show'])->name('work-orders.show');
+        Route::post('work-orders/{workOrder}/refund', [WorkOrderController::class, 'refund'])->name('work-orders.refund');
         Route::patch('work-orders/{workOrder}/status', [WorkOrderController::class, 'updateStatus'])->name('work-orders.status');
     });
 
@@ -64,23 +65,27 @@ Route::middleware(['auth', 'track.impersonation'])->group(function () {
         Route::post('{mechanic}/payout', [PayrollController::class, 'payout'])->name('payout');
     });
 
-    // Kas Bengkel - kasir boleh input mutasi; owner/super_admin lihat semua.
+    // Kas Bengkel - kasir & owner/super_admin boleh catat mutasi (in/out).
     Route::middleware('role:kasir,owner,super_admin')->group(function () {
         Route::get('cash', [CashController::class, 'index'])->name('cash.index');
         Route::post('cash', [CashController::class, 'store'])->name('cash.store');
     });
 
-    // Penarikan kas - hanya owner & super_admin.
-    Route::middleware('role:owner,super_admin')->group(function () {
-        Route::post('cash/withdraw', [CashController::class, 'withdraw'])->name('cash.withdraw');
-    });
-
-    // Produk: semua role login bisa kelola (kasir update stok & harga jual, tanpa HPP).
+    // Produk: semua role login bisa melihat (kasir read-only), tanpa HPP.
     Route::prefix('manage')->name('manage.')->group(function () {
         Route::get('/', fn () => redirect()->route('manage.products.index'))->name('index');
 
         Route::get('products/lookup', [ProductController::class, 'lookup'])->name('products.lookup');
-        Route::resource('products', ProductController::class)->except(['show']);
+        Route::get('products', [ProductController::class, 'index'])->name('products.index');
+
+        // CRUD produk hanya Owner/Super Admin — kasir read-only.
+        Route::middleware('role:owner,super_admin')->group(function () {
+            Route::get('products/create', [ProductController::class, 'create'])->name('products.create');
+            Route::post('products', [ProductController::class, 'store'])->name('products.store');
+            Route::get('products/{product}/edit', [ProductController::class, 'edit'])->name('products.edit');
+            Route::put('products/{product}', [ProductController::class, 'update'])->name('products.update');
+            Route::delete('products/{product}', [ProductController::class, 'destroy'])->name('products.destroy');
+        });
     });
 
     // Zona khusus Owner & Super Admin

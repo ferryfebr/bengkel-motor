@@ -7,14 +7,19 @@ use App\Http\Requests\Product\UpdateProductRequest;
 use App\Http\Resources\ProductResource;
 use App\Models\Category;
 use App\Models\Product;
+use App\Models\StockHistory;
 use App\Services\ActivityLogService;
+use App\Services\StockService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class ProductController extends Controller
 {
-    public function __construct(private readonly ActivityLogService $activityLog) {}
+    public function __construct(
+        private readonly ActivityLogService $activityLog,
+        private readonly StockService $stockService,
+    ) {}
 
     public function index(Request $request): View
     {
@@ -52,7 +57,7 @@ class ProductController extends Controller
     public function store(StoreProductRequest $request): RedirectResponse
     {
         $data = $request->safe()->except('purchase_price');
-        if ($request->user()->can('updateHpp', Product::class)) {
+        if ($request->user()->can('updateHpp', Product::class) && $request->has('purchase_price')) {
             $data['purchase_price'] = $request->input('purchase_price');
         }
 
@@ -77,8 +82,8 @@ class ProductController extends Controller
 
     public function update(UpdateProductRequest $request, Product $product): RedirectResponse
     {
-        $data = $request->safe()->except('purchase_price');
-        if ($request->user()->can('updateHpp', Product::class)) {
+        $data = $request->safe()->except(['purchase_price', 'stock_add']);
+        if ($request->user()->can('updateHpp', Product::class) && $request->has('purchase_price')) {
             $data['purchase_price'] = $request->input('purchase_price');
         }
 
@@ -86,6 +91,24 @@ class ProductController extends Controller
         $product->update($data);
 
         $this->logProductChanges($product, $original);
+
+        // Tambah stok (delta) — bukan overwrite, agar tercatat di stock_histories.
+        if ($request->filled('stock_add')) {
+            $oldStock = $product->stock;
+
+            $this->stockService->adjust(
+                $product,
+                (int) $request->integer('stock_add'),
+                StockHistory::TYPE_IN,
+                'Penambahan stok',
+                $request->user(),
+            );
+
+            $this->activityLog->log('update stock', $product, null,
+                ['stock' => $oldStock],
+                ['stock' => $product->stock],
+            );
+        }
 
         return redirect()->route('manage.products.index')->with('status', 'Produk berhasil diperbarui.');
     }

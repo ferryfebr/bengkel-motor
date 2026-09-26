@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class TransactionDetail extends Model
 {
@@ -37,6 +38,35 @@ class TransactionDetail extends Model
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);
+    }
+
+    public function returnItems(): HasMany
+    {
+        return $this->hasMany(TransactionReturnItem::class, 'transaction_detail_id');
+    }
+
+    /**
+     * Jumlah qty yang sudah pernah direfund untuk baris ini.
+     */
+    public function refundedQty(): int
+    {
+        if ($this->relationLoaded('returnItems')) {
+            return (int) $this->returnItems->sum('qty');
+        }
+
+        return (int) $this->returnItems()->sum('qty');
+    }
+
+    /**
+     * Sisa qty yang masih bisa direfund (hanya produk stok internal).
+     */
+    public function refundableQty(): int
+    {
+        if ($this->is_external) {
+            return 0;
+        }
+
+        return max(0, (int) $this->qty - $this->refundedQty());
     }
 
     public function displayName(): string

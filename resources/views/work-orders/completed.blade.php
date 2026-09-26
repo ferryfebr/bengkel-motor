@@ -46,7 +46,14 @@
                 <tbody class="divide-y divide-line">
                     @forelse ($transactions as $t)
                         <tr class="hover:bg-paper-dim/60 transition-colors">
-                            <td class="px-4 py-2.5 font-mono text-xs text-ink-500">{{ $t->invoice_number }}</td>
+                            <td class="px-4 py-2.5 font-mono text-xs text-ink-500">
+                                {{ $t->invoice_number }}
+                                @if ($t->returns_count > 0)
+                                    <div class="mt-1">
+                                        <span class="badge bg-danger-light text-danger font-semibold">⛔ ADA REFUND</span>
+                                    </div>
+                                @endif
+                            </td>
                             <td class="px-4 py-2.5 text-ink-600 whitespace-nowrap">{{ $t->created_at->format('d/m/Y H:i') }}</td>
                             <td class="px-4 py-2.5 font-semibold text-ink">{{ $t->plate_number }}</td>
                             <td class="px-4 py-2.5 text-ink-700">{{ $t->motor_type ?: '-' }}</td>

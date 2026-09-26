@@ -9,10 +9,15 @@
             <p class="text-sm text-paper-dim mt-1">Anda masuk sebagai <strong class="text-signal">Super Admin</strong>.</p>
         </div>
 
-        <div class="grid grid-cols-2 lg:grid-cols-3 gap-4">
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <x-stat-card label="Transaksi Hari Ini" :value="number_format($todayTransactions)" />
             <x-stat-card label="Omset Hari Ini" value="Rp {{ number_format($todayGross, 0, ',', '.') }}" tone="success" />
             <x-stat-card label="Transaksi Final" :value="number_format(\App\Models\Transaction::final()->count())" />
+            <div class="bg-white border border-line rounded-md p-5">
+                <div class="text-[13px] font-medium text-ink-500">Kas Keluar Hari Ini</div>
+                <div class="font-num tabular text-2xl font-bold text-danger mt-2">Rp {{ number_format($cashOutToday, 0, ',', '.') }}</div>
+                <a href="{{ route('cash.index', ['period' => 'today', 'type' => 'out']) }}" class="inline-block text-xs font-semibold text-signal mt-2 hover:underline">Lihat rincian kas keluar →</a>
+            </div>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">

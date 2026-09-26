@@ -41,7 +41,6 @@ class CashFlowTest extends TestCase
             'purchase_price' => 10000,
             'selling_price' => $sell,
             'stock' => 20,
-            'min_stock' => 1,
         ]);
     }
 
@@ -95,7 +94,8 @@ class CashFlowTest extends TestCase
 
         $owner = User::factory()->owner()->create();
 
-        $this->actingAs($owner)->post('/cash/withdraw', [
+        $this->actingAs($owner)->post('/cash', [
+            'type' => 'out',
             'amount' => 30000,
             'description' => 'setoran pemilik',
         ])->assertRedirect();
@@ -105,24 +105,6 @@ class CashFlowTest extends TestCase
             'type' => CashMutation::TYPE_OUT,
             'amount' => 30000,
         ]);
-    }
-
-    public function test_penarikan_melebihi_saldo_ditolak(): void
-    {
-        $owner = User::factory()->owner()->create();
-
-        $this->actingAs($owner)->post('/cash/withdraw', [
-            'amount' => 100000,
-        ])->assertSessionHasErrors('amount');
-
-        $this->assertSame(0.0, CashMutation::balance());
-    }
-
-    public function test_kasir_tidak_bisa_menarik_kas(): void
-    {
-        $this->actingAs($this->kasir)->post('/cash/withdraw', [
-            'amount' => 1000,
-        ])->assertForbidden();
     }
 
     public function test_mutasi_keluar_melebihi_saldo_ditolak(): void
@@ -136,5 +118,65 @@ class CashFlowTest extends TestCase
         ])->assertSessionHasErrors('amount');
 
         $this->assertSame(0.0, CashMutation::balance());
+    }
+
+    public function test_kategori_kas_tercatat_sesuai_sumber(): void
+    {
+        $wo = $this->makeWo();
+
+        $this->actingAs($this->kasir)->post("/pos/{$wo->id}/checkout", [
+            'payment_method' => 'cash',
+            'payment_status' => 'lunas',
+            'work_status' => 'selesai',
+            'external_products' => [[
+                'name' => 'Kampas Rem',
+                'qty' => 1,
+                'purchase_price' => 10000,
+                'selling_price' => 15000,
+            ]],
+        ])->assertRedirect();
+
+        // Kas keluar produk luar.
+        $this->assertDatabaseHas('cash_mutations', [
+            'type' => CashMutation::TYPE_OUT,
+            'category' => CashMutation::CATEGORY_EXTERNAL_PRODUCT,
+        ]);
+
+        // Kas masuk pembayaran transaksi.
+        $this->assertDatabaseHas('cash_mutations', [
+            'type' => CashMutation::TYPE_IN,
+            'category' => CashMutation::CATEGORY_TRANSACTION_INCOME,
+        ]);
+
+        // Kas keluar manual.
+        $owner = User::factory()->owner()->create();
+        $this->actingAs($owner)->post('/cash', [
+            'type' => 'out',
+            'amount' => 1000,
+            'description' => 'beli alat',
+        ])->assertRedirect();
+
+        $this->assertDatabaseHas('cash_mutations', [
+            'type' => CashMutation::TYPE_OUT,
+            'category' => CashMutation::CATEGORY_MANUAL,
+        ]);
+    }
+
+    public function test_dashboard_owner_menampilkan_total_kas_keluar(): void
+    {
+        $owner = User::factory()->owner()->create();
+
+        CashMutation::create([
+            'type' => CashMutation::TYPE_OUT,
+            'amount' => 25000,
+            'category' => CashMutation::CATEGORY_MANUAL,
+            'description' => 'beli alat',
+            'user_id' => $owner->id,
+        ]);
+
+        $this->actingAs($owner)->get('/dashboard')
+            ->assertOk()
+            ->assertSee('Kas Keluar Hari Ini')
+            ->assertSee('25.000');
     }
 }

@@ -61,6 +61,7 @@ class MechanicPayrollService
             $user,
             null,
             $impersonatedBy,
+            CashMutation::CATEGORY_MECHANIC_PAYOUT,
         );
 
         return $payout;

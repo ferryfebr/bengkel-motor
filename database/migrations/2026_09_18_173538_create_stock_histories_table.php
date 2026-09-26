@@ -16,7 +16,7 @@ return new class extends Migration
             // transaction_id nullable + nullOnDelete: saat transaksi lama di-reposisi (retensi),
             // log stok tetap utuh (lihat RINGKASAN_SISTEM_v3.md §J4).
             $table->foreignId('transaction_id')->nullable()->constrained('transactions')->nullOnDelete();
-            $table->enum('type', ['in', 'out', 'adjustment', 'sale']);
+            $table->enum('type', ['in', 'out', 'adjustment', 'sale', 'return']);
             $table->integer('qty_change');
             $table->decimal('old_selling_price', 12, 2)->nullable();
             $table->decimal('new_selling_price', 12, 2)->nullable();

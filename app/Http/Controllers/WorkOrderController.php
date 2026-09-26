@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\WorkOrder\RefundTransactionRequest;
 use App\Http\Requests\WorkOrder\StoreWorkOrderRequest;
 use App\Http\Requests\WorkOrder\UpdateWorkStatusRequest;
 use App\Models\Mechanic;
@@ -10,6 +11,7 @@ use App\Models\Transaction;
 use App\Services\ActivityLogService;
 use App\Services\CsvExportService;
 use App\Services\InvoiceService;
+use App\Services\RefundService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -17,6 +19,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Throwable;
 
 class WorkOrderController extends Controller
 {
@@ -24,6 +27,7 @@ class WorkOrderController extends Controller
         private readonly InvoiceService $invoiceService,
         private readonly ActivityLogService $activityLog,
         private readonly CsvExportService $csvExport,
+        private readonly RefundService $refundService,
     ) {}
 
     /**
@@ -63,6 +67,7 @@ class WorkOrderController extends Controller
 
         $transactions = $this->completedQuery($request, $from, $to)
             ->with(['details', 'services'])
+            ->withCount('returns')
             ->orderByDesc('created_at')
             ->paginate(20)
             ->withQueryString();
@@ -150,7 +155,16 @@ class WorkOrderController extends Controller
 
     public function show(Request $request, Transaction $workOrder): View
     {
-        $workOrder->load(['cashier', 'details.product', 'services.mechanic', 'services.shares.mechanic', 'mechanicShares.mechanic']);
+        $workOrder->load([
+            'cashier',
+            'details.product',
+            'details.returnItems',
+            'services.mechanic',
+            'services.shares.mechanic',
+            'mechanicShares.mechanic',
+            'returns.items.product',
+            'returns.user',
+        ]);
 
         return view('work-orders.show', [
             'transaction' => $workOrder,
@@ -158,6 +172,27 @@ class WorkOrderController extends Controller
             'mechanics' => Mechanic::active()->orderBy('name')->get(),
             'canViewHpp' => $request->user()->can('viewHpp', Product::class),
         ]);
+    }
+
+    /**
+     * Refund produk stok dari transaksi final (append-only, record baru).
+     */
+    public function refund(RefundTransactionRequest $request, Transaction $workOrder): RedirectResponse
+    {
+        try {
+            $this->refundService->refund(
+                $workOrder,
+                $request->input('items', []),
+                $request->input('reason'),
+                $request->user(),
+                $request->attributes->get('impersonated_by'),
+            );
+        } catch (Throwable $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return redirect()->route('work-orders.show', $workOrder)
+            ->with('status', 'Refund berhasil dicatat. Stok & kas telah disesuaikan.');
     }
 
     /**

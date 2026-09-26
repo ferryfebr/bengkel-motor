@@ -1,5 +1,6 @@
 @php
     $product = $product ?? null;
+    $isEdit = $product !== null;
 @endphp
 
 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -48,17 +49,26 @@
         <x-input-error :messages="$errors->get('selling_price')" class="mt-2" />
     </div>
 
-    <div>
-        <x-input-label for="stock" :value="__('Stok')" />
-        <x-text-input id="stock" name="stock" type="number" min="0" class="mt-1 block w-full"
-                      :value="old('stock', $product?->stock ?? 0)" required />
-        <x-input-error :messages="$errors->get('stock')" class="mt-2" />
-    </div>
+    @if ($isEdit)
+        <div>
+            <x-input-label for="stock" :value="__('Stok Saat Ini')" />
+            <x-text-input id="stock" type="text" class="mt-1 block w-full bg-paper-dim" :value="$product->stock" disabled />
+            <p class="text-xs text-ink-400 mt-1">Stok diubah lewat kolom "Tambah Stok" di samping, bukan ditimpa.</p>
+        </div>
 
-    <div>
-        <x-input-label for="min_stock" :value="__('Stok Minimum')" />
-        <x-text-input id="min_stock" name="min_stock" type="number" min="0" class="mt-1 block w-full"
-                      :value="old('min_stock', $product?->min_stock ?? 3)" />
-        <x-input-error :messages="$errors->get('min_stock')" class="mt-2" />
-    </div>
+        <div>
+            <x-input-label for="stock_add" :value="__('Tambah Stok')" />
+            <x-text-input id="stock_add" name="stock_add" type="number" min="1" step="1" class="mt-1 block w-full"
+                          :value="old('stock_add')" placeholder="mis. 15" />
+            <x-input-error :messages="$errors->get('stock_add')" class="mt-2" />
+            <p class="text-xs text-ink-400 mt-1">Isi jumlah barang yang masuk. Contoh: stok 20 + isi 15 = 35.</p>
+        </div>
+    @else
+        <div>
+            <x-input-label for="stock" :value="__('Stok Awal')" />
+            <x-text-input id="stock" name="stock" type="number" min="0" class="mt-1 block w-full"
+                          :value="old('stock', 0)" required />
+            <x-input-error :messages="$errors->get('stock')" class="mt-2" />
+        </div>
+    @endif
 </div>

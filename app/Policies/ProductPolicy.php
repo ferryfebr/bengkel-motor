@@ -21,19 +21,21 @@ class ProductPolicy
     }
 
     /**
-     * Kasir & Owner/Super Admin boleh membuat produk baru (tanpa HPP).
+     * Hanya Owner/Super Admin yang boleh membuat produk baru.
+     * Kasir hanya bisa melihat (read-only).
      */
     public function create(User $user): bool
     {
-        return true;
+        return $user->hasRole(User::ROLE_OWNER, User::ROLE_SUPER_ADMIN);
     }
 
     /**
-     * Kasir boleh update stok & harga jual, tapi tidak HPP.
+     * Hanya Owner/Super Admin yang boleh mengubah produk.
+     * Kasir hanya bisa melihat (read-only).
      */
     public function update(User $user, Product $product): bool
     {
-        return true;
+        return $user->hasRole(User::ROLE_OWNER, User::ROLE_SUPER_ADMIN);
     }
 
     public function delete(User $user, Product $product): bool

@@ -21,7 +21,6 @@ class StoreProductRequest extends FormRequest
             'name' => ['required', 'string', 'max:150'],
             'selling_price' => ['required', 'numeric', 'min:0'],
             'stock' => ['required', 'integer', 'min:0'],
-            'min_stock' => ['nullable', 'integer', 'min:0'],
             // HPP hanya boleh dikirim oleh yang punya ability updateHpp.
             'purchase_price' => [
                 Rule::prohibitedIf(fn () => ! $this->user()->can('updateHpp', Product::class)),

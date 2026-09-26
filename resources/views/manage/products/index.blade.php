@@ -2,9 +2,11 @@
     <x-slot name="header">
         <div class="flex items-center justify-between gap-3 w-full">
             <h1 class="text-lg font-bold text-ink">{{ __('Produk / Sparepart') }}</h1>
-            <a href="{{ route('manage.products.create') }}" class="btn-primary">
-                + Tambah Produk
-            </a>
+            @can('create', App\Models\Product::class)
+                <a href="{{ route('manage.products.create') }}" class="btn-primary">
+                    + Tambah Produk
+                </a>
+            @endcan
         </div>
     </x-slot>
 
@@ -55,11 +57,13 @@
                                 </td>
                             @endif
                             <td class="px-4 py-2.5 text-right tabular text-ink">{{ number_format($product->selling_price, 0, ',', '.') }}</td>
-                            <td class="px-4 py-2.5 text-right tabular {{ $product->stock <= $product->min_stock ? 'text-danger font-semibold' : 'text-ink' }}">
+                            <td class="px-4 py-2.5 text-right tabular {{ $product->stock < 5 ? 'text-danger font-semibold' : 'text-ink' }}">
                                 {{ $product->stock }}
                             </td>
                             <td class="px-4 py-2.5 text-right whitespace-nowrap">
-                                <a href="{{ route('manage.products.edit', $product) }}" class="btn-secondary px-3">Edit</a>
+                                @can('update', $product)
+                                    <a href="{{ route('manage.products.edit', $product) }}" class="btn-secondary px-3">Edit</a>
+                                @endcan
                                 @can('delete', $product)
                                     <form method="POST" action="{{ route('manage.products.destroy', $product) }}" class="inline"
                                           onsubmit="return confirm('Hapus produk ini?')">

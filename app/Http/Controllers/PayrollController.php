@@ -22,6 +22,8 @@ class PayrollController extends Controller
 
     public function index(Request $request): View
     {
+        $isManager = $request->user()->hasRole('owner', 'super_admin');
+
         [$from, $to] = $this->range($request);
         $activeOnly = true;
 
@@ -29,12 +31,12 @@ class PayrollController extends Controller
             ->when($activeOnly, fn ($q) => $q->active())
             ->orderBy('name')
             ->get()
-            ->map(function (Mechanic $m) use ($from, $to) {
+            ->map(function (Mechanic $m) use ($from, $to, $isManager) {
                 return [
                     'mechanic' => $m,
                     'earned' => $this->payroll->earned($m->id, $from, $to),
-                    'withdrawn' => $this->payroll->withdrawn($m->id),
-                    'balance' => $this->payroll->balance($m->id),
+                    'withdrawn' => $isManager ? $this->payroll->withdrawn($m->id) : null,
+                    'balance' => $isManager ? $this->payroll->balance($m->id) : null,
                 ];
             });
 
@@ -43,13 +45,16 @@ class PayrollController extends Controller
             'from' => $from,
             'to' => $to,
             'period' => $request->string('period')->toString(),
+            'canViewPayouts' => $isManager,
             'totalEarned' => $mechanics->sum('earned'),
-            'totalBalance' => $mechanics->sum('balance'),
+            'totalBalance' => $isManager ? $mechanics->sum('balance') : null,
         ]);
     }
 
     public function show(Request $request, Mechanic $mechanic): View
     {
+        $isManager = $request->user()->hasRole('owner', 'super_admin');
+
         [$from, $to] = $this->range($request);
 
         $shares = TransactionMechanicShare::with('transaction')
@@ -58,19 +63,23 @@ class PayrollController extends Controller
             ->orderByDesc('created_at')
             ->get();
 
-        $payouts = MechanicPayout::with('user')
-            ->where('mechanic_id', $mechanic->id)
-            ->orderByDesc('created_at')
-            ->get();
+        // Riwayat penarikan gaji hanya untuk owner/super_admin (kasir tidak boleh lihat).
+        $payouts = $isManager
+            ? MechanicPayout::with('user')
+                ->where('mechanic_id', $mechanic->id)
+                ->orderByDesc('created_at')
+                ->get()
+            : collect();
 
         return view('payroll.show', [
             'mechanic' => $mechanic,
             'shares' => $shares,
             'payouts' => $payouts,
+            'canViewPayouts' => $isManager,
             'earned' => $this->payroll->earned($mechanic->id, $from, $to),
             'earnedAll' => $this->payroll->earned($mechanic->id),
-            'withdrawn' => $this->payroll->withdrawn($mechanic->id),
-            'balance' => $this->payroll->balance($mechanic->id),
+            'withdrawn' => $isManager ? $this->payroll->withdrawn($mechanic->id) : null,
+            'balance' => $isManager ? $this->payroll->balance($mechanic->id) : null,
             'from' => $from,
             'to' => $to,
             'period' => $request->string('period')->toString(),

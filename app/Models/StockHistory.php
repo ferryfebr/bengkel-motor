@@ -15,6 +15,8 @@ class StockHistory extends Model
 
     public const TYPE_SALE = 'sale';
 
+    public const TYPE_RETURN = 'return';
+
     // Append-only: tidak pakai updated_at.
     public const UPDATED_AT = null;
 
