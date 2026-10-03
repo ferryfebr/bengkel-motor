@@ -17,6 +17,7 @@ class RefundService
         private readonly StockService $stockService,
         private readonly CashService $cashService,
         private readonly ActivityLogService $activityLog,
+        private readonly DailySummaryService $summaryService,
     ) {}
 
     /**
@@ -82,7 +83,7 @@ class RefundService
 
         $total = round($total, 2);
 
-        return DB::transaction(function () use ($transaction, $lines, $reason, $total, $user, $impersonatedBy) {
+        $return = DB::transaction(function () use ($transaction, $lines, $reason, $total, $user, $impersonatedBy) {
             $return = TransactionReturn::create([
                 'transaction_id' => $transaction->id,
                 'user_id' => $user->id,
@@ -124,15 +125,17 @@ class RefundService
 
             $this->activityLog->log('refund', $transaction, $transaction->id, null, [
                 'total' => $total,
-                'items' => array_map(fn ($line) => [
-                    'product' => $line['detail']->displayName(),
-                    'qty' => $line['qty'],
-                    'line_total' => $line['line_total'],
-                ], $lines),
+                'items_count' => array_sum(array_map(fn ($line) => $line['qty'], $lines)),
+                'items' => array_map(fn ($line) => $line['detail']->displayName().' x'.$line['qty'], $lines),
                 'reason' => $reason,
             ]);
 
             return $return->refresh();
         });
+
+        // Segarkan ringkasan hari transaksi agar omset bersih ikut berkurang.
+        $this->summaryService->build($transaction->created_at);
+
+        return $return;
     }
 }

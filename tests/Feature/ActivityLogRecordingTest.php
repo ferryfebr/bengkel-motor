@@ -167,4 +167,51 @@ class ActivityLogRecordingTest extends TestCase
 
         $this->assertDatabaseHas('activity_logs', ['action' => 'update mechanic_ratio']);
     }
+
+    public function test_login_dan_logout_tercatat_di_activity_log(): void
+    {
+        $user = User::factory()->kasir()->create([
+            'username' => 'kasirlog',
+            'is_active' => true,
+            'password' => bcrypt('password'),
+        ]);
+
+        $this->post('/login', ['username' => 'kasirlog', 'password' => 'password'])
+            ->assertRedirect('/dashboard');
+
+        $this->assertDatabaseHas('activity_logs', [
+            'action' => 'login',
+            'model_id' => $user->id,
+        ]);
+
+        $this->post('/logout')->assertRedirect('/');
+
+        $this->assertDatabaseHas('activity_logs', [
+            'action' => 'logout',
+            'model_id' => $user->id,
+        ]);
+    }
+
+    public function test_login_muncul_di_kategori_akun(): void
+    {
+        $user = User::factory()->kasir()->create([
+            'username' => 'kasirakun',
+            'is_active' => true,
+            'password' => bcrypt('password'),
+        ]);
+        $owner = User::factory()->owner()->create();
+
+        $this->post('/login', ['username' => 'kasirakun', 'password' => 'password']);
+        $this->assertDatabaseHas('activity_logs', ['action' => 'login', 'model_id' => $user->id]);
+
+        // Muncul di kategori "Akun & Login" (milik owner, karena kasir tidak akses aktivitas).
+        $this->actingAs($owner)->get('/activity?category=akun')
+            ->assertOk()
+            ->assertSee('Login');
+
+        // Tidak nyasar ke "Lainnya".
+        $this->actingAs($owner)->get('/activity?category=sistem')
+            ->assertOk()
+            ->assertDontSee('Masuk ke sistem');
+    }
 }

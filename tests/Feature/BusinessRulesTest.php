@@ -242,4 +242,54 @@ class BusinessRulesTest extends TestCase
         $this->assertFalse($fresh->isFinal());
         $this->assertNull($fresh->finalized_at);
     }
+
+    public function test_porsi_mekanik_dan_bengkel_selalu_utuh_setelah_pembulatan(): void
+    {
+        $service = app(CommissionService::class);
+
+        foreach ([33333, 100001, 99999.99, 1, 100000] as $price) {
+            foreach ([80, 75, 66.67, 50] as $ratio) {
+                $split = $service->split((float) $price, (float) $ratio);
+
+                // mechanic_fee + bengkel_fee harus sama dengan harga jasa (toleransi 1 sen).
+                $this->assertEqualsWithDelta(
+                    (float) $price,
+                    $split['mechanic_fee'] + $split['bengkel_fee'],
+                    0.011,
+                    "Porsi tidak utuh untuk harga {$price} rasio {$ratio}."
+                );
+            }
+        }
+    }
+
+    public function test_grand_total_sama_dengan_penjumlahan_semua_item(): void
+    {
+        $product = $this->makeProduct(); // jual 20.000
+        $mechanic = Mechanic::create(['name' => 'Andi', 'mechanic_percentage' => 80]);
+        $wo = $this->makeWo();
+
+        $this->actingAs($this->kasir)->post("/pos/{$wo->id}/checkout", [
+            'payment_method' => 'cash',
+            'payment_status' => 'lunas',
+            'work_status' => 'selesai',
+            'products' => [['product_id' => $product->id, 'qty' => 3]], // 60.000
+            'external_products' => [[
+                'name' => 'Kampas', 'qty' => 2, 'purchase_price' => 10000, 'selling_price' => 15000,
+            ]], // 30.000
+            'services' => [[
+                'service_name' => 'Servis', 'price' => 50000,
+                'shares' => [['mechanic_id' => $mechanic->id, 'amount' => 40000]],
+            ]], // 50.000
+        ])->assertRedirect();
+
+        $fresh = $wo->fresh();
+        $expected = 60000 + 30000 + 50000;
+
+        $this->assertSame((float) $expected, (float) $fresh->grand_total);
+        $this->assertSame(140000.0, (float) $fresh->subtotal_products + (float) $fresh->subtotal_services);
+
+        // Total baris detail + jasa = grand total.
+        $lines = $fresh->details->sum('line_total') + $fresh->services->sum('service_price');
+        $this->assertSame((float) $expected, (float) $lines);
+    }
 }

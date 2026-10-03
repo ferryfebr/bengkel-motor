@@ -128,7 +128,7 @@ class PosController extends Controller
      */
     public function receipt(Transaction $transaction): View
     {
-        $transaction->load(['cashier', 'details.product', 'services.shares.mechanic']);
+        $transaction->load(['cashier', 'details.product', 'services.shares.mechanic', 'returns']);
 
         return view('pos.receipt', compact('transaction'));
     }

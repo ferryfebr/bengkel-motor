@@ -33,9 +33,10 @@
             @endif
         </form>
 
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
             <x-stat-card label="Omset Kotor" value="Rp {{ number_format($summary['gross_revenue'], 0, ',', '.') }}" />
             <x-stat-card label="Jumlah Transaksi Final" :value="number_format($summary['total_transactions'], 0, ',', '.')" />
+            <x-stat-card label="Refund" value="Rp {{ number_format($summary['refund_total'], 0, ',', '.') }}" :tone="$summary['refund_total'] > 0 ? 'danger' : 'default'" />
             <div class="bg-white border border-line rounded-md p-5">
                 <div class="text-[13px] font-medium text-ink-500">Kas Masuk / Keluar</div>
                 <div class="font-num tabular text-xl font-bold text-success mt-2">Rp {{ number_format($summary['total_cash_in'], 0, ',', '.') }}</div>

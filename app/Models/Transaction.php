@@ -78,6 +78,11 @@ class Transaction extends Model
         return $this->hasMany(TransactionReturn::class);
     }
 
+    public function cashMutations(): HasMany
+    {
+        return $this->hasMany(CashMutation::class);
+    }
+
     public function isFinal(): bool
     {
         return $this->work_status === self::WORK_SELESAI

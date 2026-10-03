@@ -235,3 +235,18 @@ append-only pada tabel log, snapshot harga transaksi, dan retensi
 - Kalau di tengah fase agent menyimpang dari `ARCHITECTURE.md`/`SECURITY.md` (misal taruh logic komisi langsung di Controller), koreksi langsung: *"Itu melanggar ARCHITECTURE.md — logic komisi harus di CommissionService, bukan di Controller. Perbaiki."*
 - Kalau verifikasi satu fase gagal, jangan lanjut ke fase berikutnya — perbaiki dulu di fase yang sama.
 - Update kolom **Status** di tiap fase (☐ → ✅) supaya progress project ini juga bisa dibaca ulang oleh agent di sesi berikutnya.
+
+---
+
+## Backlog (belum dikerjakan — jangan dikerjakan tanpa konfirmasi)
+
+- [x] **Catat login (semua role, termasuk kasir) ke `activity_logs`.** ✅ Selesai.
+  Login & logout kini tercatat (action `login`/`logout`) dan muncul di kategori "Akun & Login". Login gagal belum dicatat (opsional, hindari noise). Rename tab tetap "Akun & Login".
+- [ ] (Opsional) Catat **login gagal** bila perlu deteksi percobaan masuk.
+
+## Catatan Lain
+
+- Indikator disk Panel Sistem kini menghitung **pemakaian aplikasi vs kuota** (`DISK_QUOTA_MB`, default 2048), bukan partisi server.
+- Komisi mekanik **dipertahankan** setelah retensi lewat tabel `mechanic_daily_summaries` (diisi saat `summaries:build` harian & sebelum retensi menghapus transaksi). Laporan mekanik & saldo gaji tetap utuh.
+- Fitur **Pesanan Pembelian (PO)** ke distributor: tabel `suppliers`, `purchase_orders`, `purchase_order_items`; PDF via `barryvdh/laravel-dompdf`; tombol **Terima Barang** menambah stok (anti-dobel); retensi maks 2.000 PO.
+- **Omset bersih** kini = Omset Kotor − Refund − HPP (bersih) − Gaji Karyawan (share aktual), dengan rincian di halaman laporan.

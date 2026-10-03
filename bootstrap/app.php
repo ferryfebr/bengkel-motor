@@ -13,6 +13,12 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Saat tunnel lokal (Cloudflare/ngrok), permintaan masuk lewat proxy.
+        // Percayai proxy hanya di lokal agar URL/HTTPS terdeteksi benar.
+        if (env('APP_ENV') === 'local') {
+            $middleware->trustProxies(at: '*');
+        }
+
         $middleware->alias([
             'role' => EnsureUserHasRole::class,
             'track.impersonation' => TrackImpersonation::class,

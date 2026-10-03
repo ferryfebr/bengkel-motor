@@ -5,7 +5,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="csrf-token" content="{{ csrf_token() }}">
 
-        <title>{{ config('app.name', 'One Nine Nine') }}</title>
+        <title>{{ config('app.name', 'One Nine Nine Motor') }}</title>
 
         <!-- Favicon -->
         <link rel="icon" type="image/png" href="{{ asset('images/logo.JPEG') }}">
@@ -29,8 +29,10 @@
             ['route' => 'cash.index', 'label' => 'Kas Bengkel', 'pattern' => 'cash.*', 'roles' => ['kasir', 'owner', 'super_admin'], 'icon' => 'cash'],
             ['route' => 'payroll.index', 'label' => 'Gaji Karyawan', 'pattern' => 'payroll.*', 'roles' => ['kasir', 'owner', 'super_admin'], 'icon' => 'payroll'],
             ['route' => 'manage.index', 'label' => 'Manajemen', 'pattern' => 'manage.*', 'roles' => ['kasir', 'owner', 'super_admin'], 'icon' => 'box'],
+            ['route' => 'purchase-orders.index', 'label' => 'Pesanan Pembelian', 'pattern' => 'purchase-orders.*', 'roles' => ['owner', 'super_admin'], 'icon' => 'queue'],
             ['route' => 'reports.gross', 'label' => 'Laporan', 'pattern' => 'reports.*', 'roles' => ['kasir', 'owner', 'super_admin'], 'icon' => 'chart'],
             ['route' => 'activity.index', 'label' => 'Aktivitas', 'pattern' => 'activity.*', 'roles' => ['owner', 'super_admin'], 'icon' => 'activity'],
+            ['route' => 'archives.index', 'label' => 'Arsip & Backup', 'pattern' => 'archives.*', 'roles' => ['owner', 'super_admin'], 'icon' => 'server'],
             ['route' => 'impersonation.index', 'label' => 'Login Sebagai', 'pattern' => 'impersonation.*', 'roles' => ['owner', 'super_admin'], 'icon' => 'switch'],
             ['route' => 'system.index', 'label' => 'Panel Sistem', 'pattern' => 'system.*', 'roles' => ['super_admin'], 'icon' => 'server'],
         ];
@@ -49,10 +51,10 @@
             {{-- Brand --}}
             <div class="flex items-center gap-3 h-16 px-5 border-b border-white/10 shrink-0">
                 <span class="flex items-center justify-center w-9 h-9 rounded-md bg-white overflow-hidden shrink-0">
-                    <img src="{{ asset('images/logo.JPEG') }}" alt="One Nine Nine" class="w-full h-full object-contain">
+                    <img src="{{ asset('images/logo.JPEG') }}" alt="One Nine Nine Motor" class="w-full h-full object-contain">
                 </span>
                 <div class="leading-tight">
-                    <div class="font-bold text-paper">One Nine Nine</div>
+                    <div class="font-bold text-paper">One Nine Nine Motor</div>
                     <div class="text-[11px] tracking-wider text-signal">Point of Sale</div>
                 </div>
             </div>

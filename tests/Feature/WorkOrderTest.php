@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Models\Product;
 use App\Models\Transaction;
+use App\Models\TransactionDetail;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -110,11 +112,33 @@ class WorkOrderTest extends TestCase
     {
         $kasir = $this->kasir();
         $this->actingAs($kasir)->post('/work-orders', ['plate_number' => 'B 5555 EE', 'customer_name' => 'E']);
-        Transaction::first()->update(['work_status' => Transaction::WORK_SELESAI]);
+        Transaction::first()->update([
+            'work_status' => Transaction::WORK_SELESAI,
+            'payment_status' => Transaction::PAY_LUNAS,
+        ]);
 
         $this->actingAs($kasir)->get('/work-orders/queue')
             ->assertOk()
             ->assertDontSee('B 5555 EE');
+    }
+
+    public function test_wo_selesai_belum_lunas_tetap_di_list_work_order(): void
+    {
+        $kasir = $this->kasir();
+        $this->actingAs($kasir)->post('/work-orders', ['plate_number' => 'B 9090 UN', 'customer_name' => 'Unpaid']);
+
+        // Pengerjaan selesai tapi belum lunas -> bukan transaksi final.
+        Transaction::first()->update(['work_status' => Transaction::WORK_SELESAI]);
+        $this->assertFalse(Transaction::first()->isFinal());
+
+        // Tetap di list work order, tidak pindah ke transaksi selesai.
+        $this->actingAs($kasir)->get('/work-orders')
+            ->assertOk()
+            ->assertSee('B 9090 UN');
+
+        $this->actingAs($kasir)->get('/work-orders/completed')
+            ->assertOk()
+            ->assertDontSee('B 9090 UN');
     }
 
     public function test_work_order_selesai_dipindah_ke_sub_page(): void
@@ -123,7 +147,10 @@ class WorkOrderTest extends TestCase
         $this->actingAs($kasir)->post('/work-orders', ['plate_number' => 'B 6666 FF', 'customer_name' => 'F']);
         $this->actingAs($kasir)->post('/work-orders', ['plate_number' => 'B 7777 GG', 'customer_name' => 'G']);
 
-        Transaction::where('plate_number', 'B 6666 FF')->update(['work_status' => Transaction::WORK_SELESAI]);
+        Transaction::where('plate_number', 'B 6666 FF')->update([
+            'work_status' => Transaction::WORK_SELESAI,
+            'payment_status' => Transaction::PAY_LUNAS,
+        ]);
 
         // Daftar utama tidak lagi menampilkan yang selesai.
         $this->actingAs($kasir)->get('/work-orders')
@@ -142,17 +169,80 @@ class WorkOrderTest extends TestCase
     {
         $kasir = $this->kasir();
         $this->actingAs($kasir)->post('/work-orders', ['plate_number' => 'B 8888 HH', 'customer_name' => 'H']);
-        Transaction::first()->update([
+        $transaction = Transaction::first();
+        $transaction->update([
             'work_status' => Transaction::WORK_SELESAI,
             'grand_total' => 123000,
+        ]);
+        TransactionDetail::create([
+            'transaction_id' => $transaction->id,
+            'is_external' => false,
+            'qty' => 1,
+            'selling_price' => 123000,
+            'line_total' => 123000,
         ]);
 
         $response = $this->actingAs($kasir)->get('/work-orders/completed/export');
 
         $response->assertOk();
         $content = $response->streamedContent();
-        $this->assertStringContainsString('Total Dibayar', $content);
+        $this->assertStringContainsString('Total Transaksi (Rp)', $content);
+        $this->assertStringContainsString('Total Refund (Rp)', $content);
         $this->assertStringContainsString('B 8888 HH', $content);
-        $this->assertStringContainsString('123.000', $content);
+        $this->assertStringContainsString('123000,00', $content);
+    }
+
+    public function test_struk_thermal_render_ukuran_58_dan_80_mm(): void
+    {
+        $kasir = $this->kasir();
+        $this->actingAs($kasir)->post('/work-orders', ['plate_number' => 'B 55 TX', 'customer_name' => 'Thermal']);
+        $transaction = Transaction::first();
+        $transaction->update([
+            'work_status' => Transaction::WORK_SELESAI,
+            'payment_status' => Transaction::PAY_LUNAS,
+            'grand_total' => 50000,
+            'finalized_at' => now(),
+        ]);
+        TransactionDetail::create([
+            'transaction_id' => $transaction->id,
+            'is_external' => false,
+            'qty' => 1,
+            'selling_price' => 50000,
+            'line_total' => 50000,
+        ]);
+
+        // Default 58mm.
+        $this->actingAs($kasir)->get(route('pos.receipt', $transaction))
+            ->assertOk()
+            ->assertSee('size: 58mm auto')
+            ->assertSee('B 55 TX')
+            ->assertSee('Total Qty')
+            ->assertSee('Sub Total')
+            ->assertSee('TOTAL');
+
+        // Pilihan 80mm.
+        $this->actingAs($kasir)->get(route('pos.receipt', ['transaction' => $transaction, 'paper' => '80']))
+            ->assertOk()
+            ->assertSee('size: 80mm auto');
+    }
+
+    public function test_kode_sku_tertanam_di_form_pos_untuk_scan_barcode(): void
+    {
+        $product = Product::create([
+            'code_sku' => '8991234567890',
+            'name' => 'Oli Barcode',
+            'selling_price' => 45000,
+            'stock' => 10,
+        ]);
+
+        $kasir = $this->kasir();
+        $this->actingAs($kasir)->post('/work-orders', ['plate_number' => 'B 66 BC', 'customer_name' => 'Scan']);
+        $wo = Transaction::latest('id')->first();
+
+        // Kode SKU (barcode) harus ada di HTML agar JS pencocokan scan bekerja.
+        $this->actingAs($kasir)->get(route('work-orders.show', $wo))
+            ->assertOk()
+            ->assertSee('8991234567890')
+            ->assertSee('Oli Barcode');
     }
 }

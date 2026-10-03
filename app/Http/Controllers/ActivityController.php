@@ -31,7 +31,7 @@ class ActivityController extends Controller
 
         [$from, $to] = $this->range($request);
 
-        $transaksiActions = ['create wo', 'update work_status', 'update draft', 'checkout', 'create external_product'];
+        $transaksiActions = ['create wo', 'update work_status', 'update draft', 'checkout', 'create external_product', 'refund'];
 
         if ($category === 'transaksi') {
             // Satu baris per transaksi; rincian aktivitas dilihat di halaman detail.
@@ -172,10 +172,10 @@ class ActivityController extends Controller
     private function applyCategory(Builder $query, string $category): void
     {
         match ($category) {
-            'transaksi' => $query->whereIn('action', ['create wo', 'update work_status', 'update draft', 'checkout', 'create external_product']),
+            'transaksi' => $query->whereIn('action', ['create wo', 'update work_status', 'update draft', 'checkout', 'create external_product', 'refund']),
             'kas' => $query->whereIn('action', ['create cash_mutation', 'withdraw cash', 'mechanic payout']),
             'akun' => $query->where(function ($q) {
-                $q->whereIn('action', ['create kasir', 'update kasir', 'delete kasir'])
+                $q->whereIn('action', ['create kasir', 'update kasir', 'delete kasir', 'login', 'logout'])
                     ->orWhere('action', 'like', 'impersonate%');
             }),
             'mekanik' => $query->where(function ($q) {
@@ -184,12 +184,14 @@ class ActivityController extends Controller
             }),
             'produk' => $query->where(function ($q) {
                 $q->whereIn('model_type', [Product::class, Category::class])
-                    ->orWhereIn('action', ['update stock', 'update product_price', 'update product_hpp']);
+                    ->orWhereIn('action', ['update stock', 'update product_price', 'update product_hpp', 'create po', 'receive po', 'cancel po', 'create supplier', 'delete supplier']);
             }),
             default => $query->whereNotIn('action', [
-                'create wo', 'update work_status', 'update draft', 'checkout', 'create external_product',
+                'create wo', 'update work_status', 'update draft', 'checkout', 'create external_product', 'refund',
                 'create cash_mutation', 'withdraw cash', 'mechanic payout', 'create kasir', 'update kasir', 'delete kasir',
+                'login', 'logout', 'impersonate start', 'impersonate end',
                 'update mechanic_ratio', 'update stock', 'update product_price', 'update product_hpp',
+                'create po', 'receive po', 'cancel po', 'create supplier', 'delete supplier',
             ])->whereNotIn('model_type', [Product::class, Category::class, Mechanic::class]),
         };
     }

@@ -8,7 +8,9 @@ use App\Models\Setting;
 use App\Models\Transaction;
 use App\Models\TransactionReturn;
 use App\Models\User;
+use App\Services\ReportService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Tests\TestCase;
 
 class RefundTest extends TestCase
@@ -170,5 +172,65 @@ class RefundTest extends TestCase
         $this->actingAs($this->kasir)->get('/work-orders/completed')
             ->assertOk()
             ->assertSee('ADA REFUND');
+    }
+
+    public function test_log_refund_masuk_kategori_transaksi_bukan_lainnya(): void
+    {
+        $product = $this->makeProduct();
+        $wo = $this->finalTransaction($product, qty: 1);
+        $detail = $wo->details->first();
+
+        $this->actingAs($this->kasir)->post("/work-orders/{$wo->id}/refund", [
+            'reason' => 'rusak',
+            'items' => [['transaction_detail_id' => $detail->id, 'qty' => 1]],
+        ])->assertRedirect();
+
+        $owner = User::factory()->owner()->create();
+
+        // Muncul di kategori Transaksi.
+        $this->actingAs($owner)->get('/activity?category=transaksi')
+            ->assertOk()
+            ->assertSee($wo->invoice_number);
+
+        // Tidak lagi muncul di kategori "Lainnya".
+        $this->actingAs($owner)->get('/activity?category=sistem')
+            ->assertOk()
+            ->assertDontSee($wo->invoice_number);
+
+        // Detail transaksi menampilkan label refund.
+        $this->actingAs($owner)->get(route('activity.show', $wo))
+            ->assertOk()
+            ->assertSee('Refund produk');
+    }
+
+    public function test_refund_mengurangi_omset_bersih(): void
+    {
+        $product = Product::create([
+            'code_sku' => 'RF-NET',
+            'name' => 'Produk Net',
+            'purchase_price' => 30000,
+            'selling_price' => 45000,
+            'stock' => 10,
+        ]);
+        $wo = $this->finalTransaction($product, qty: 2); // gross 90.000, HPP 60.000, net 30.000
+        $detail = $wo->details->first();
+
+        $before = app(ReportService::class)->revenue(Carbon::today(), Carbon::today());
+        $this->assertSame(90000.0, $before['gross_revenue']);
+        $this->assertSame(60000.0, $before['cogs']);
+        $this->assertSame(30000.0, $before['net_revenue']);
+
+        // Refund 1 unit.
+        $this->actingAs($this->kasir)->post("/work-orders/{$wo->id}/refund", [
+            'items' => [['transaction_detail_id' => $detail->id, 'qty' => 1]],
+        ])->assertRedirect();
+
+        $after = app(ReportService::class)->revenue(Carbon::today(), Carbon::today());
+
+        $this->assertSame(45000.0, $after['refund_total']);
+        $this->assertSame(30000.0, $after['cogs']); // HPP 1 unit dipulihkan
+        // Net = 90.000 - 45.000 (refund) - 30.000 (HPP bersih) = 15.000.
+        $this->assertSame(15000.0, $after['net_revenue']);
+        $this->assertLessThan($before['net_revenue'], $after['net_revenue']);
     }
 }

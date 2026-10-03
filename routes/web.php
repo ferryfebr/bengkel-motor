@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\ActivityController;
+use App\Http\Controllers\ArchiveController;
 use App\Http\Controllers\CashController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\DashboardController;
@@ -10,7 +11,9 @@ use App\Http\Controllers\PayrollController;
 use App\Http\Controllers\PosController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\PurchaseOrderController;
 use App\Http\Controllers\ReportController;
+use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\SystemController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\WorkOrderController;
@@ -113,10 +116,35 @@ Route::middleware(['auth', 'track.impersonation'])->group(function () {
         Route::get('transaction/{transaction}', [ActivityController::class, 'show'])->name('show');
     });
 
+    // Arsip & Backup - owner & super_admin bisa unduh (tanpa cPanel).
+    Route::middleware('role:owner,super_admin')->prefix('archives')->name('archives.')->group(function () {
+        Route::get('/', [ArchiveController::class, 'index'])->name('index');
+        Route::get('download-all', [ArchiveController::class, 'downloadAll'])->name('download-all');
+        Route::get('{archive}/download', [ArchiveController::class, 'download'])->name('download');
+    });
+
+    // Pesanan Pembelian (PO) ke distributor - owner & super_admin.
+    Route::middleware('role:owner,super_admin')->group(function () {
+        Route::get('purchase-orders', [PurchaseOrderController::class, 'index'])->name('purchase-orders.index');
+        Route::get('purchase-orders/create', [PurchaseOrderController::class, 'create'])->name('purchase-orders.create');
+        Route::post('purchase-orders', [PurchaseOrderController::class, 'store'])->name('purchase-orders.store');
+        Route::get('purchase-orders/{purchaseOrder}', [PurchaseOrderController::class, 'show'])->name('purchase-orders.show');
+        Route::get('purchase-orders/{purchaseOrder}/pdf', [PurchaseOrderController::class, 'pdf'])->name('purchase-orders.pdf');
+        Route::get('purchase-orders/{purchaseOrder}/print', [PurchaseOrderController::class, 'print'])->name('purchase-orders.print');
+        Route::post('purchase-orders/{purchaseOrder}/receive', [PurchaseOrderController::class, 'receive'])->name('purchase-orders.receive');
+        Route::post('purchase-orders/{purchaseOrder}/cancel', [PurchaseOrderController::class, 'cancel'])->name('purchase-orders.cancel');
+        Route::patch('purchase-orders/{purchaseOrder}/status', [PurchaseOrderController::class, 'updateStatus'])->name('purchase-orders.status');
+
+        Route::get('suppliers', [SupplierController::class, 'index'])->name('suppliers.index');
+        Route::post('suppliers', [SupplierController::class, 'store'])->name('suppliers.store');
+        Route::delete('suppliers/{supplier}', [SupplierController::class, 'destroy'])->name('suppliers.destroy');
+    });
+
     // Zona khusus Super Admin
     Route::middleware('role:super_admin')->prefix('system')->name('system.')->group(function () {
         Route::get('/', [SystemController::class, 'index'])->name('index');
         Route::get('activity-logs/export', [SystemController::class, 'exportActivityLogs'])->name('activity-logs.export');
+        Route::post('retention', [SystemController::class, 'runRetention'])->name('retention');
     });
 });
 

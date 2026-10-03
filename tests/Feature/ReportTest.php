@@ -12,6 +12,7 @@ use App\Services\DailySummaryService;
 use App\Services\ReportService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class ReportTest extends TestCase
@@ -165,5 +166,34 @@ class ReportTest extends TestCase
         $this->assertSame(2000.0, (float) $summary->gross_revenue);
         $this->assertSame(1, $summary->total_transactions);
         $this->assertSame(1, DailySummary::count());
+    }
+
+    public function test_laporan_hari_lama_tetap_ada_setelah_transaksi_diarsip(): void
+    {
+        $product = $this->makeProduct(hpp: 30000, sell: 45000);
+        $wo = $this->makeFinalTransaction([
+            'products' => [['product_id' => $product->id, 'qty' => 2]],
+        ]);
+
+        $yesterday = Carbon::today()->subDay();
+        Transaction::whereKey($wo->id)->update([
+            'created_at' => $yesterday->copy()->setTime(10, 0, 0),
+            'finalized_at' => $yesterday->copy()->setTime(10, 0, 0),
+        ]);
+
+        app(DailySummaryService::class)->build($yesterday);
+        $summary = DailySummary::whereDate('summary_date', $yesterday)->first();
+        $this->assertNotNull($summary);
+        $this->assertSame(90000.0, (float) $summary->gross_revenue);
+
+        // Simulasi retensi: transaksi + detail dihapus permanen.
+        DB::table('transactions')->where('id', $wo->id)->delete();
+        $this->assertSame(0, Transaction::whereKey($wo->id)->count());
+
+        // Laporan tetap menampilkan angka dari ringkasan.
+        $report = app(ReportService::class)->revenue($yesterday, $yesterday);
+        $this->assertSame(90000.0, $report['gross_revenue']);
+        $this->assertSame(30000.0, $report['net_revenue']);
+        $this->assertSame(1, $report['total_transactions']);
     }
 }

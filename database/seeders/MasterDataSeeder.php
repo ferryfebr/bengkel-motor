@@ -56,7 +56,7 @@ class MasterDataSeeder extends Seeder
         foreach ($categories as $categoryName => $products) {
             $category = Category::firstOrCreate(['name' => $categoryName]);
 
-            foreach ($products as [$sku, $name, $purchase, $selling, $stock, $minStock]) {
+            foreach ($products as [$sku, $name, $purchase, $selling, $stock]) {
                 Product::updateOrCreate(
                     ['code_sku' => $sku],
                     [
@@ -65,7 +65,6 @@ class MasterDataSeeder extends Seeder
                         'purchase_price' => $purchase,
                         'selling_price' => $selling,
                         'stock' => $stock,
-                        'min_stock' => $minStock,
                     ]
                 );
             }

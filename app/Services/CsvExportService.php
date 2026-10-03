@@ -10,8 +10,11 @@ use Illuminate\Support\Carbon;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
- * Export CSV transaksi & activity_logs untuk backup & arsip reposisi
- * (RINGKASAN §H6/J9). Ditulis streaming agar hemat memori shared hosting.
+ * Export & arsip CSV (RESIKO_HOSTING.md, RINGKASAN §H6/J9).
+ *
+ * Format (semua file): 1 baris = 1 item, pemisah ";", BOM UTF-8,
+ * tanggal dd/mm/yyyy hh:mm, nominal angka polos (desimal koma).
+ * Ditulis streaming agar hemat memori shared hosting.
  */
 class CsvExportService
 {
@@ -20,8 +23,10 @@ class CsvExportService
      */
     public const ARCHIVE_DIR = 'archives';
 
+    private const DELIMITER = ';';
+
     /**
-     * Stream CSV transaksi final (beserta detail, jasa, komisi) ke browser.
+     * Stream CSV transaksi final (rincian per item).
      */
     public function streamTransactions(?Carbon $from = null, ?Carbon $to = null): StreamedResponse
     {
@@ -31,96 +36,130 @@ class CsvExportService
             ->when($from, fn ($q) => $q->where('created_at', '>=', $from->copy()->startOfDay()))
             ->when($to, fn ($q) => $q->where('created_at', '<=', $to->copy()->endOfDay()));
 
-        $maxItems = (clone $query)->withCount(['details', 'services'])->get()
-            ->map(fn ($t) => $t->details_count + $t->services_count)->max() ?? 0;
-
         $filename = 'transaksi-'.($from?->toDateString() ?? 'awal').'-'.($to?->toDateString() ?? 'kini').'.csv';
 
-        return response()->streamDownload(function () use ($query, $maxItems) {
+        return response()->streamDownload(function () use ($query) {
             $out = fopen('php://output', 'w');
-
-            $header = ['Invoice', 'Tanggal', 'Customer', 'Plat', 'Jenis Motor'];
-            for ($i = 1; $i <= $maxItems; $i++) {
-                $header[] = 'Item '.$i;
-            }
-            $header[] = 'Total';
-            fputcsv($out, $header);
+            $this->writeBom($out);
+            fputcsv($out, [
+                'Invoice', 'Tanggal', 'Pelanggan', 'Plat', 'Jenis Motor',
+                'Jenis Item', 'Nama Item', 'Qty', 'Harga Satuan (Rp)', 'Subtotal (Rp)',
+                'Status Bayar', 'Metode', 'Total Transaksi (Rp)', 'Dibayar (Rp)', 'Sisa (Rp)',
+            ], self::DELIMITER);
 
             foreach ($query->with(['details.product', 'services'])->orderBy('id')->lazyById(200) as $t) {
-                fputcsv($out, $this->summaryRow($t, $maxItems));
+                $this->writeTransactionRows($out, $t, false);
             }
 
             fclose($out);
-        }, $filename, ['Content-Type' => 'text/csv']);
+        }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
     }
 
     /**
-     * Baris ringkas transaksi: item beserta biaya + total di kolom terakhir.
-     *
-     * @return array<int, mixed>
+     * Stream CSV transaksi yang sudah selesai + informasi refund.
      */
-    private function summaryRow(Transaction $t, int $maxItems): array
+    public function streamCompletedTransactions(?Carbon $from = null, ?Carbon $to = null, string $search = ''): StreamedResponse
     {
-        $items = $t->details->map(function ($d) {
-            $name = $d->is_external ? $d->external_name : optional($d->product)->name;
+        $filename = 'transaksi-selesai-'.($from?->toDateString() ?? 'awal').'-'.($to?->toDateString() ?? 'kini').'.csv';
 
-            return $name.' x'.$d->qty.' = Rp '.number_format((float) $d->line_total, 0, ',', '.');
-        })->all();
+        return response()->streamDownload(function () use ($from, $to, $search) {
+            $out = fopen('php://output', 'w');
+            $this->writeBom($out);
+            fputcsv($out, [
+                'Invoice', 'Tanggal', 'Pelanggan', 'Plat', 'Jenis Motor',
+                'Jenis Item', 'Nama Item', 'Qty', 'Harga Satuan (Rp)', 'Subtotal (Rp)',
+                'Status Bayar', 'Metode', 'Total Transaksi (Rp)', 'Dibayar (Rp)', 'Sisa (Rp)',
+                'Total Refund (Rp)', 'Sisa Setelah Refund (Rp)',
+            ], self::DELIMITER);
 
-        foreach ($t->services as $s) {
-            $items[] = $s->service_name.' = Rp '.number_format((float) $s->service_price, 0, ',', '.');
-        }
+            foreach ($this->completedQuery($from, $to, $search)
+                ->with(['details.product', 'services', 'returns.items.product'])
+                ->orderBy('id')
+                ->lazyById(200) as $t) {
+                $this->writeTransactionRows($out, $t, true);
+            }
 
-        $row = [
+            fclose($out);
+        }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
+    }
+
+    /**
+     * Tulis header + baris satu transaksi (1 baris per item).
+     * Mode $withRefund menambah kolom Total Refund & Sisa Setelah Refund + baris refund.
+     */
+    private function writeTransactionRows($out, Transaction $t, bool $withRefund): void
+    {
+        $t->loadMissing(['details.product', 'services', 'returns.items.product']);
+
+        $refundTotal = (float) $t->returns->sum('total');
+        $sisa = round((float) $t->grand_total - $refundTotal, 2);
+
+        $base = [
             $t->invoice_number,
-            optional($t->created_at)->format('d/m/Y H:i'),
+            $this->dt($t->created_at),
             $t->customer_name,
             $t->plate_number,
             $t->motor_type,
         ];
+        $tail = [
+            $this->statusLabel($t->payment_status),
+            $t->payment_method,
+            $this->num($t->grand_total),
+            $this->num($t->paid_amount),
+            $this->num($t->remainingAmount()),
+        ];
 
-        for ($i = 0; $i < $maxItems; $i++) {
-            $row[] = $items[$i] ?? '';
+        foreach ($t->details as $d) {
+            $row = array_merge($base, [
+                $d->is_external ? 'Produk Luar' : 'Produk',
+                $d->displayName(),
+                $d->qty,
+                $this->num($d->selling_price),
+                $this->num($d->line_total),
+            ], $tail);
+
+            if ($withRefund) {
+                $row[] = $this->num($refundTotal);
+                $row[] = $this->num($sisa);
+            }
+
+            fputcsv($out, $row, self::DELIMITER);
         }
 
-        $row[] = 'Rp '.number_format((float) $t->grand_total, 0, ',', '.');
+        foreach ($t->services as $s) {
+            $row = array_merge($base, [
+                'Jasa',
+                $s->service_name,
+                1,
+                $this->num($s->service_price),
+                $this->num($s->service_price),
+            ], $tail);
 
-        return $row;
-    }
-
-    /**
-     * Stream CSV transaksi yang sudah selesai: rincian tiap produk & jasa
-     * beserta biayanya, dengan total dibayar di kolom paling kanan.
-     */
-    public function streamCompletedTransactions(?Carbon $from = null, ?Carbon $to = null, string $search = ''): StreamedResponse
-    {
-        $maxItems = $this->completedQuery($from, $to, $search)
-            ->withCount(['details', 'services'])
-            ->get()
-            ->map(fn ($t) => $t->details_count + $t->services_count)
-            ->max() ?? 0;
-
-        $filename = 'transaksi-selesai-'.($from?->toDateString() ?? 'awal').'-'.($to?->toDateString() ?? 'kini').'.csv';
-
-        return response()->streamDownload(function () use ($from, $to, $search, $maxItems) {
-            $out = fopen('php://output', 'w');
-
-            $header = ['Invoice', 'Tanggal', 'Customer', 'Plat', 'Jenis Motor'];
-            for ($i = 1; $i <= $maxItems; $i++) {
-                $header[] = 'Item '.$i;
-            }
-            $header[] = 'Total Dibayar';
-            fputcsv($out, $header);
-
-            foreach ($this->completedQuery($from, $to, $search)
-                ->with(['details.product', 'services'])
-                ->orderBy('id')
-                ->lazyById(200) as $t) {
-                fputcsv($out, $this->summaryRow($t, $maxItems));
+            if ($withRefund) {
+                $row[] = $this->num($refundTotal);
+                $row[] = $this->num($sisa);
             }
 
-            fclose($out);
-        }, $filename, ['Content-Type' => 'text/csv']);
+            fputcsv($out, $row, self::DELIMITER);
+        }
+
+        if ($withRefund) {
+            foreach ($t->returns as $ret) {
+                $ret->loadMissing('items.product');
+                foreach ($ret->items as $it) {
+                    fputcsv($out, array_merge($base, [
+                        'Refund',
+                        $it->product?->name ?? 'Produk',
+                        $it->qty,
+                        $this->num($it->unit_price),
+                        $this->num($it->line_total),
+                    ], $tail, [
+                        $this->num($refundTotal),
+                        $this->num($sisa),
+                    ]), self::DELIMITER);
+                }
+            }
+        }
     }
 
     private function completedQuery(?Carbon $from, ?Carbon $to, string $search): Builder
@@ -139,7 +178,7 @@ class CsvExportService
     }
 
     /**
-     * Stream CSV activity_logs (retensi J9).
+     * Stream CSV activity_logs.
      */
     public function streamActivityLogs(?Carbon $before = null): StreamedResponse
     {
@@ -147,7 +186,10 @@ class CsvExportService
 
         return response()->streamDownload(function () use ($before) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['Waktu', 'Aktor', 'Kategori', 'Aktivitas', 'Keterangan']);
+            $this->writeBom($out);
+            fputcsv($out, [
+                'Waktu', 'Pelaku', 'Dipengaruhi Oleh', 'Kategori', 'Aktivitas', 'Keterangan',
+            ], self::DELIMITER);
 
             $query = ActivityLog::with('user')->orderBy('id');
             if ($before) {
@@ -156,20 +198,22 @@ class CsvExportService
 
             foreach ($query->lazyById(500) as $log) {
                 fputcsv($out, [
-                    optional($log->created_at)->format('d/m/Y H:i'),
+                    $this->dt($log->created_at),
                     $log->user?->name ?? '-',
+                    $log->impersonated_by ? 'Admin #'.$log->impersonated_by.' (Login Sebagai)' : '-',
                     ActivityPresenter::CATEGORIES[ActivityPresenter::category($log->action, $log->model_type)] ?? '-',
                     ActivityPresenter::label($log->action),
                     ActivityPresenter::describe($log),
-                ]);
+                ], self::DELIMITER);
             }
 
             fclose($out);
-        }, $filename, ['Content-Type' => 'text/csv']);
+        }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
     }
 
     /**
-     * Tulis file CSV arsip transaksi ke storage/app/archives, kembalikan path relatif.
+     * Tulis 1 file CSV arsip lengkap (transaksi + item + jasa + komisi + refund + kas),
+     * kembalikan path relatif terhadap storage/app.
      *
      * @param  iterable<Transaction>  $transactions
      */
@@ -180,18 +224,19 @@ class CsvExportService
             mkdir($dir, 0755, true);
         }
 
-        $relative = self::ARCHIVE_DIR.'/transaksi-'.$label.'.csv';
+        $relative = self::ARCHIVE_DIR.'/arsip-'.$label.'.csv';
         $path = storage_path('app/'.$relative);
 
         $out = fopen($path, 'w');
+        $this->writeBom($out);
         fputcsv($out, [
-            'invoice_number', 'created_at', 'finalized_at', 'customer_name', 'plate_number',
-            'cashier_id', 'subtotal_products', 'subtotal_services', 'grand_total',
-            'payment_method', 'work_status', 'payment_status', 'details', 'services', 'mechanic_shares',
-        ]);
+            'Invoice', 'Tanggal', 'Pelanggan', 'Plat', 'Jenis Motor', 'Kasir',
+            'Jenis Baris', 'Nama', 'Qty', 'Harga Satuan (Rp)', 'Subtotal (Rp)',
+            'Total Transaksi (Rp)', 'Total Refund (Rp)', 'Status Bayar', 'Metode',
+        ], self::DELIMITER);
 
         foreach ($transactions as $transaction) {
-            fputcsv($out, $this->transactionToRow($transaction));
+            $this->writeArchiveRows($out, $transaction);
         }
 
         fclose($out);
@@ -200,45 +245,109 @@ class CsvExportService
     }
 
     /**
-     * @return array<int, mixed>
+     * Baris arsip lengkap satu transaksi.
      */
-    private function transactionToRow(Transaction $transaction): array
+    private function writeArchiveRows($out, Transaction $t): void
     {
-        $details = $transaction->details->map(fn ($d) => [
-            'name' => $d->is_external ? $d->external_name : optional($d->product)->name,
-            'qty' => $d->qty,
-            'selling_price' => (float) $d->selling_price,
-            'line_total' => (float) $d->line_total,
-        ])->all();
+        $t->loadMissing([
+            'cashier',
+            'details.product',
+            'services.shares.mechanic',
+            'returns.items.product',
+            'cashMutations',
+        ]);
 
-        $services = $transaction->services->map(fn ($s) => [
-            'service_name' => $s->service_name,
-            'price' => (float) $s->service_price,
-            'mechanic_fee' => (float) $s->mechanic_fee,
-            'bengkel_fee' => (float) $s->bengkel_fee,
-        ])->all();
+        $refundTotal = (float) $t->returns->sum('total');
 
-        $shares = $transaction->mechanicShares->map(fn ($s) => [
-            'mechanic_id' => $s->mechanic_id,
-            'share_amount' => (float) $s->share_amount,
-        ])->all();
-
-        return [
-            $transaction->invoice_number,
-            optional($transaction->created_at)->toDateTimeString(),
-            optional($transaction->finalized_at)->toDateTimeString(),
-            $transaction->customer_name,
-            $transaction->plate_number,
-            $transaction->cashier_id,
-            (float) $transaction->subtotal_products,
-            (float) $transaction->subtotal_services,
-            (float) $transaction->grand_total,
-            $transaction->payment_method,
-            $transaction->work_status,
-            $transaction->payment_status,
-            json_encode($details),
-            json_encode($services),
-            json_encode($shares),
+        $base = [
+            $t->invoice_number,
+            $this->dt($t->created_at),
+            $t->customer_name,
+            $t->plate_number,
+            $t->motor_type,
+            $t->cashier?->name,
         ];
+        $tail = [
+            $this->num($t->grand_total),
+            $this->num($refundTotal),
+            $this->statusLabel($t->payment_status),
+            $t->payment_method,
+        ];
+
+        $push = function (array $row) use ($out, $base, $tail) {
+            fputcsv($out, array_merge($base, $row, $tail), self::DELIMITER);
+        };
+
+        foreach ($t->details as $d) {
+            $push([
+                $d->is_external ? 'Produk Luar' : 'Produk',
+                $d->displayName(),
+                $d->qty,
+                $this->num($d->selling_price),
+                $this->num($d->line_total),
+            ]);
+        }
+
+        foreach ($t->services as $s) {
+            $push(['Jasa', $s->service_name, 1, $this->num($s->service_price), $this->num($s->service_price)]);
+
+            foreach ($s->shares as $share) {
+                $push([
+                    'Komisi Mekanik',
+                    ($share->mechanic?->name ?? 'Mekanik').' ('.$this->num($share->mechanic_ratio).'%)',
+                    1,
+                    $this->num($share->share_amount),
+                    $this->num($share->share_amount),
+                ]);
+            }
+        }
+
+        foreach ($t->returns as $ret) {
+            $ret->loadMissing('items.product');
+            foreach ($ret->items as $it) {
+                $push([
+                    'Refund',
+                    $it->product?->name ?? 'Produk',
+                    $it->qty,
+                    $this->num($it->unit_price),
+                    $this->num($it->line_total),
+                ]);
+            }
+        }
+
+        foreach ($t->cashMutations as $c) {
+            $push([
+                $c->type === 'in' ? 'Kas Masuk' : 'Kas Keluar',
+                $c->description ?: '-',
+                1,
+                $this->num($c->amount),
+                $this->num($c->amount),
+            ]);
+        }
+    }
+
+    private function writeBom($out): void
+    {
+        fwrite($out, "\xEF\xBB\xBF");
+    }
+
+    private function num($value): string
+    {
+        return number_format((float) $value, 2, ',', '');
+    }
+
+    private function dt(?Carbon $date): string
+    {
+        return $date ? $date->format('d/m/Y H:i') : '';
+    }
+
+    private function statusLabel(?string $status): string
+    {
+        return match ($status) {
+            'lunas' => 'Lunas',
+            'dp' => 'DP',
+            'belum_bayar' => 'Belum Bayar',
+            default => (string) $status,
+        };
     }
 }

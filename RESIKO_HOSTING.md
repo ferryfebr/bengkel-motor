@@ -2,7 +2,7 @@
 
 Analisis risiko performa & stabilitas untuk hosting **Domainesia shared, 2GB SSD NVMe, MySQL** — beserta pagar pengaman yang dipilih. Requirement klien **tidak diubah**; dokumen ini hanya mengatur *cara* agar web tidak down.
 
-> **Keputusan yang sudah diambil:** batas **8.000 transaksi final**; retensi `activity_logs` **12 bulan / 50.000 baris**; file arsip **dihapus >30 hari**; reposisi dijalankan **via cron**, bukan saat checkout.
+> **Keputusan yang sudah diambil:** batas **8.000 transaksi final**; retensi `activity_logs` **3 bulan / 3.000 baris** (FIFO, tanpa arsip otomatis); file arsip transaksi **disimpan permanen** dan diunduh lewat menu **Arsip & Backup**; reposisi dijalankan **via cron**, bukan saat checkout.
 
 ---
 
@@ -33,12 +33,13 @@ Penyumbang ukuran nyata:
 5. `vendor/` (~50–100 MB), file session, cache Blade.
 
 **Mitigasi (diterapkan):**
-- Batas **8.000 transaksi final** (J1).
-- Retensi `activity_logs` **12 bulan / 50rb baris**, export dulu lalu hapus (J9).
+- Batas **8.000 transaksi final** (J1) — command `transactions:retain` (arsip CSV lalu hapus), dijadwalkan 02:30.
+- Retensi `activity_logs` **3 bulan / 3.000 baris** (J9) — command `activity:prune`, dijadwalkan 02:45. Tanpa arsip otomatis (export manual tetap tersedia di Panel Sistem).
 - `stock_histories` **tidak** dihapus (audit inti).
-- File arsip **auto-hapus >30 hari** (J8).
-- `laravel.log` rotasi harian, hapus >14 hari (J10).
-- Peringatan dini bila penggunaan >70% (J11).
+- File arsip transaksi **disimpan permanen** (J8); owner mengunduh via menu **Arsip & Backup**.
+- `laravel.log` rotasi harian, hapus >14 hari (J10) — `logs:rotate`.
+- Prune `sessions` kedaluwarsa — `sessions:prune`.
+- Peringatan dini bila penggunaan disk >70% di **Panel Sistem** (J11).
 
 ### R2 — Auto-arsip saat checkout bikin timeout (KRITIS)
 Kalau reposisi dijalankan di tengah request checkout, kasir bisa lihat error karena `max_execution_time` terlampaui. Walau DB transaction rollback, pengalaman kasir buruk.
@@ -102,24 +103,28 @@ Asumsi per transaksi final: 3 detail produk + 2 jasa + 3 pembagian mekanik + 1 p
 
 | # | Pagar | Nilai |
 |---|---|---|
-| 1 | Batas transaksi final | 8.000 |
-| 2 | Retensi `activity_logs` | 12 bulan / 50.000 baris, export dulu |
+| 1 | Batas transaksi final | 8.000 (`transactions:retain`) |
+| 2 | Retensi `activity_logs` | 3 bulan / 3.000 baris, FIFO, tanpa arsip otomatis |
 | 3 | `stock_histories` | tidak dihapus (append-only) |
-| 4 | File arsip CSV | auto-hapus >30 hari |
+| 4 | File arsip CSV | disimpan permanen, unduh via menu Arsip & Backup |
 | 5 | `laravel.log` | rotasi harian, hapus >14 hari |
 | 6 | Session/cache | driver `database`, prune terjadwal |
 | 7 | Reposisi | via cron, bukan saat checkout |
-| 8 | Peringatan disk | tampil bila >70% |
+| 8 | Peringatan disk | tampil di Panel Sistem bila >70% |
 | 9 | Queue Board polling | 15–30 detik |
 | 10 | Laporan | `daily_summaries`, bukan hitung ulang |
 | 11 | Aset | build lokal, tanpa `node_modules` di hosting |
+| 12 | Tombol retensi manual | Panel Sistem (fallback bila cron mati) |
+| 13 | Pesanan pembelian (PO) | maks 2.000 PO (`purchase-orders:retain`) |
 
 ---
 
 ## 5. Batas yang Tetap Risiko (jujur)
 
-1. Bila bengkel sangat ramai & log produksi cepat, `activity_logs` 50.000 baris/12 bulan bisa tetap terasa besar. **Pantau peringatan disk.**
-2. Kalau cron hosting tidak andal, reposisi harus dijalankan manual berkala — perlu disiplin Super Admin/Owner.
-3. Kalau disk mendekati penuh, tidak ada jalan lain selain membersihkan arsip/log atau **upgrade hosting** (yang sudah dinyatakan tidak bisa). Karena itu pagar #1–#11 **wajib** diimplementasikan, bukan opsional.
+1. Karena `activity_logs` hanya disimpan 3 bulan / 3.000 baris, penyelidikan masalah/kecurangan lama terbatas ~3 bulan terakhir. Data transaksi & keuangan tetap utuh.
+2. Kalau cron hosting tidak andal, reposisi harus dijalankan manual berkala via tombol **Jalankan Retensi** di Panel Sistem.
+3. Kalau disk mendekati penuh, tidak ada jalan lain selain membersihkan arsip/log atau **upgrade hosting** (yang sudah dinyatakan tidak bisa). Karena itu pagar #1–#12 **wajib** diimplementasikan, bukan opsional.
+4. File arsip transaksi disimpan di server. Owner **wajib** mengunduh & menyimpan cadangan sendiri (menu Arsip & Backup) — file di server bukan backup aman bila hosting bermasalah.
+5. Riwayat **komisi mekanik** tetap utuh setelah retensi lewat tabel `mechanic_daily_summaries` (diisi `summaries:build` harian & sebelum retensi). Angka per orang tetap tersedia di Laporan Mekanik & Gaji.
 
-**Rekomendasi terakhir:** implementasikan pagar di atas sejak awal, dan tampilkan indikator disk di dashboard Super Admin agar masalah terdeteksi sebelum web down.
+**Rekomendasi terakhir:** pantau indikator disk di Panel Sistem agar masalah terdeteksi sebelum web down.

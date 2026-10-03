@@ -6,20 +6,24 @@ use App\Models\ActivityLog;
 use App\Models\Transaction;
 use App\Models\TransactionArchive;
 use App\Services\CsvExportService;
+use App\Services\DiskUsageService;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Throwable;
 
 class SystemController extends Controller
 {
     public function __construct(
         private readonly CsvExportService $csvExport,
+        private readonly DiskUsageService $diskUsage,
     ) {}
 
     /**
-     * Panel sistem Super Admin (read-only).
-     * Tidak ada fitur retensi/auto-hapus data — sistem append-only (SECURITY.md).
+     * Panel sistem Super Admin + status disk & retensi.
      */
     public function index(): View
     {
@@ -29,17 +33,47 @@ class SystemController extends Controller
                 ->where('payment_status', Transaction::PAY_LUNAS)
                 ->count(),
             'activityLogCount' => ActivityLog::count(),
-            'archives' => TransactionArchive::orderByDesc('created_at')->paginate(15),
+            'archiveCount' => TransactionArchive::count(),
+            'retention' => [
+                'transactions' => (int) config('retention.transactions', 8000),
+                'activity_max' => (int) config('retention.activity_max', 3000),
+                'activity_months' => (int) config('retention.activity_months', 3),
+                'purchase_orders' => (int) config('retention.purchase_orders', 2000),
+            ],
+            'disk' => $this->diskUsage->report(),
         ]);
     }
 
     /**
-     * Export CSV activity_logs (backup manual, tanpa menghapus data).
+     * Export CSV activity_logs.
      */
     public function exportActivityLogs(Request $request): StreamedResponse
     {
         $before = $request->filled('before') ? Carbon::parse($request->input('before')) : null;
 
         return $this->csvExport->streamActivityLogs($before);
+    }
+
+    /**
+     * Jalankan retensi sekarang (fallback bila cron hosting tidak jalan).
+     */
+    public function runRetention(): RedirectResponse
+    {
+        $outputs = [];
+
+        foreach (['transactions:retain', 'activity:prune', 'purchase-orders:retain', 'sessions:prune', 'logs:rotate'] as $command) {
+            try {
+                Artisan::call($command);
+                $outputs[] = trim(Artisan::output());
+            } catch (Throwable $e) {
+                $outputs[] = "{$command} gagal: ".$e->getMessage();
+            }
+        }
+
+        // Segarkan indikator disk setelah retensi.
+        $this->diskUsage->forget();
+
+        return redirect()->route('system.index')
+            ->with('status', 'Retensi dijalankan. '.implode(' ', array_filter($outputs)));
     }
 }

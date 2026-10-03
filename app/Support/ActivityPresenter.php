@@ -23,7 +23,10 @@ class ActivityPresenter
         if (str_starts_with($action, 'impersonate')) {
             return 'akun';
         }
-        if (in_array($action, ['create wo', 'update work_status', 'update draft', 'checkout', 'create external_product'], true)) {
+        if (in_array($action, ['login', 'logout'], true)) {
+            return 'akun';
+        }
+        if (in_array($action, ['create wo', 'update work_status', 'update draft', 'checkout', 'create external_product', 'refund'], true)) {
             return 'transaksi';
         }
         if (in_array($action, ['create cash_mutation', 'withdraw cash', 'mechanic payout'], true)) {
@@ -36,7 +39,7 @@ class ActivityPresenter
             return 'mekanik';
         }
         if (in_array($modelType, ['App\\Models\\Product', 'App\\Models\\Category'], true)
-            || in_array($action, ['update stock', 'update product_price', 'update product_hpp', 'create external_product'], true)) {
+            || in_array($action, ['update stock', 'update product_price', 'update product_hpp', 'create external_product', 'create po', 'receive po', 'cancel po', 'create supplier', 'delete supplier'], true)) {
             return 'produk';
         }
 
@@ -50,10 +53,16 @@ class ActivityPresenter
             'update work_status' => 'Ubah status pengerjaan',
             'update draft' => 'Simpan draft nota',
             'checkout' => 'Selesaikan transaksi',
+            'refund' => 'Refund produk',
             'create external_product' => 'Tambah produk luar',
             'update stock' => 'Ubah stok',
             'update product_price' => 'Ubah harga jual',
             'update product_hpp' => 'Ubah HPP',
+            'create po' => 'Buat pesanan pembelian',
+            'receive po' => 'Terima barang PO',
+            'cancel po' => 'Batalkan pesanan pembelian',
+            'create supplier' => 'Tambah distributor',
+            'delete supplier' => 'Hapus distributor',
             'create cash_mutation' => 'Catat mutasi kas',
             'withdraw cash' => 'Penarikan kas',
             'mechanic payout' => 'Penarikan gaji mekanik',
@@ -63,6 +72,8 @@ class ActivityPresenter
             'update mechanic_ratio' => 'Ubah rasio mekanik',
             'impersonate start' => 'Mulai "Login Sebagai"',
             'impersonate end' => 'Selesai "Login Sebagai"',
+            'login' => 'Login',
+            'logout' => 'Logout',
             'create' => 'Tambah data',
             'update' => 'Ubah data',
             'delete' => 'Hapus data',
@@ -80,16 +91,24 @@ class ActivityPresenter
             'update work_status' => 'Mengubah status pengerjaan dari "'.self::status($old['work_status'] ?? '-').'" menjadi "'.self::status($new['work_status'] ?? '-').'".',
             'update draft' => 'Menyimpan draft nota.',
             'checkout' => 'Menyelesaikan transaksi. Total '.self::money($new['grand_total'] ?? 0).', dibayar '.self::money($new['paid_amount'] ?? 0).'.',
+            'refund' => self::refund($new),
             'create external_product' => 'Menambah produk luar "'.($new['name'] ?? '-').'" (jual '.self::money($new['selling_price'] ?? 0).').',
             'update stock' => 'Mengubah stok dari '.($old['stock'] ?? '-').' menjadi '.($new['stock'] ?? '-').'.',
             'update product_price' => 'Mengubah harga jual dari '.self::money($old['old_selling_price'] ?? 0).' menjadi '.self::money($new['new_selling_price'] ?? 0).'.',
             'update product_hpp' => 'Mengubah HPP produk.',
+            'create po' => 'Membuat pesanan pembelian '.($new['po_number'] ?? '-').' ('.($new['items_count'] ?? 0).' item, '.self::money($new['total'] ?? 0).').',
+            'receive po' => 'Menerima barang PO '.($new['po_number'] ?? '-').' — stok ditambahkan.',
+            'cancel po' => 'Membatalkan PO '.($new['po_number'] ?? '-').'.',
+            'create supplier' => 'Menambah distributor "'.($new['name'] ?? '-').'".',
+            'delete supplier' => 'Menghapus distributor "'.($old['name'] ?? '-').'".',
             'create cash_mutation' => self::cash($new),
             'withdraw cash' => 'Menarik kas '.self::money($new['amount'] ?? 0).'.',
             'mechanic payout' => 'Menarik gaji mekanik sebesar '.self::money($new['amount'] ?? 0).'.',
             'update mechanic_ratio' => 'Mengubah rasio: mekanik '.($new['mechanic_percentage'] ?? '-').'%, bengkel '.($new['bengkel_percentage'] ?? '-').'%.',
             'impersonate start' => 'Memulai "Login Sebagai" user #'.($new['target_user_id'] ?? '-').'.',
             'impersonate end' => 'Mengakhiri "Login Sebagai".',
+            'login' => 'Masuk ke sistem sebagai '.self::roleLabel($new['role'] ?? null).'.',
+            'logout' => 'Keluar dari sistem.',
             default => self::generic($log, $old, $new),
         };
     }
@@ -100,6 +119,18 @@ class ActivityPresenter
 
         return 'Mencatat kas '.$type.' sebesar '.self::money($new['amount'] ?? 0)
             .(! empty($new['description']) ? ' ('.$new['description'].')' : '').'.';
+    }
+
+    private static function refund(array $new): string
+    {
+        $qty = (int) ($new['items_count'] ?? 0);
+        $text = 'Meretur '.$qty.' item senilai '.self::money($new['total'] ?? 0).'.';
+
+        if (! empty($new['reason'])) {
+            $text .= ' Alasan: '.$new['reason'].'.';
+        }
+
+        return $text;
     }
 
     private static function generic(ActivityLog $log, array $old, array $new): string
@@ -130,6 +161,16 @@ class ActivityPresenter
             'proses' => 'Sedang Dikerjakan',
             'selesai' => 'Selesai',
             default => $s,
+        };
+    }
+
+    private static function roleLabel(?string $role): string
+    {
+        return match ($role) {
+            'super_admin' => 'Super Admin',
+            'owner' => 'Owner',
+            'kasir' => 'Kasir',
+            default => 'pengguna',
         };
     }
 

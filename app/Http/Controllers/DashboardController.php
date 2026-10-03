@@ -20,7 +20,7 @@ class DashboardController extends Controller
         $data = [
             'user' => $user,
             'todayTransactions' => Transaction::whereDate('created_at', Carbon::today())->count(),
-            'ongoingWorkOrders' => Transaction::where('work_status', '!=', Transaction::WORK_SELESAI)->count(),
+            'ongoingWorkOrders' => Transaction::ongoing()->count(),
             'todayGross' => (float) Transaction::final()
                 ->whereDate('created_at', Carbon::today())
                 ->sum('grand_total'),

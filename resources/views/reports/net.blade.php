@@ -34,9 +34,35 @@
             <x-stat-card label="Transaksi Final" :value="number_format($summary['total_transactions'], 0, ',', '.')" />
         </div>
 
-        <p class="text-xs text-ink-500">
-            Omset Bersih = (penjualan produk − HPP produk) + porsi bengkel dari jasa.
-        </p>
+        {{-- Rincian perhitungan --}}
+        <div class="bg-white border border-line rounded-md p-5">
+            <div class="font-semibold text-ink mb-3">Rincian Perhitungan Omset Bersih</div>
+            <table class="min-w-full font-condensed text-sm">
+                <tbody class="divide-y divide-line">
+                    <tr>
+                        <td class="py-2 text-ink-700">Omset Kotor (penjualan)</td>
+                        <td class="py-2 text-right tabular text-ink">Rp {{ number_format($summary['gross_revenue'], 0, ',', '.') }}</td>
+                    </tr>
+                    <tr>
+                        <td class="py-2 text-ink-700 text-danger">− Refund</td>
+                        <td class="py-2 text-right tabular text-danger">Rp {{ number_format($summary['refund_total'], 0, ',', '.') }}</td>
+                    </tr>
+                    <tr>
+                        <td class="py-2 text-ink-700 text-danger">− HPP Produk (bersih setelah refund)</td>
+                        <td class="py-2 text-right tabular text-danger">Rp {{ number_format($summary['cogs'], 0, ',', '.') }}</td>
+                    </tr>
+                    <tr>
+                        <td class="py-2 text-ink-700 text-danger">− Gaji Karyawan (porsi mekanik)</td>
+                        <td class="py-2 text-right tabular text-danger">Rp {{ number_format($summary['mechanic_fee'], 0, ',', '.') }}</td>
+                    </tr>
+                    <tr class="font-semibold text-ink">
+                        <td class="py-3">= Omset Bersih</td>
+                        <td class="py-3 text-right tabular text-xl">Rp {{ number_format($summary['net_revenue'], 0, ',', '.') }}</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p class="text-xs text-ink-500 mt-2">Porsi bengkel dari jasa (Rp {{ number_format($summary['bengkel_fee'], 0, ',', '.') }}) sudah termasuk dalam omset bersih.</p>
+        </div>
 
         <div class="bg-white border border-line rounded-md overflow-hidden">
             <table class="min-w-full font-condensed text-sm">

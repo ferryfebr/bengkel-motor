@@ -36,7 +36,7 @@ class WorkOrderController extends Controller
     public function index(Request $request): View
     {
         $transactions = Transaction::with('cashier')
-            ->where('work_status', '!=', Transaction::WORK_SELESAI)
+            ->ongoing()
             ->when($request->filled('status') && $request->status !== 'semua', function ($query) use ($request) {
                 $query->where('work_status', $request->string('status'));
             })
@@ -109,7 +109,7 @@ class WorkOrderController extends Controller
     private function completedQuery(Request $request, Carbon $from, Carbon $to): Builder
     {
         return Transaction::query()
-            ->where('work_status', Transaction::WORK_SELESAI)
+            ->final()
             ->whereBetween('created_at', [$from, $to])
             ->when($request->filled('q'), function ($query) use ($request) {
                 $q = $request->string('q');
@@ -223,7 +223,7 @@ class WorkOrderController extends Controller
      */
     public function queue(): View
     {
-        $ongoing = Transaction::where('work_status', '!=', Transaction::WORK_SELESAI)
+        $ongoing = Transaction::ongoing()
             ->with('cashier')
             ->orderByRaw("CASE work_status WHEN 'proses' THEN 0 ELSE 1 END")
             ->orderBy('created_at')
