@@ -9,9 +9,11 @@ use App\Models\Product;
 use App\Models\Transaction;
 use App\Services\ActivityLogService;
 use App\Services\TransactionService as TransactionServiceEngine;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\Response;
 use Throwable;
 
 class PosController extends Controller
@@ -131,5 +133,24 @@ class PosController extends Controller
         $transaction->load(['cashier', 'details.product', 'services.shares.mechanic', 'returns']);
 
         return view('pos.receipt', compact('transaction'));
+    }
+
+    /**
+     * Struk versi PDF (dompdf) - jaring pengaman untuk perangkat/browser yang
+     * tidak mendukung window.print() (mis. Mi Browser di Android).
+     */
+    public function receiptPdf(Request $request, Transaction $transaction): Response
+    {
+        $transaction->load(['cashier', 'details.product', 'services', 'returns']);
+
+        $paper = in_array($request->query('paper'), ['57', '58', '80'], true) ? $request->query('paper') : '58';
+        $widthPt = round((float) $paper * 2.83465, 2);
+        $lineCount = 14 + ($transaction->details->count() * 2) + ($transaction->services->count() * 2) + 12;
+        $heightPt = max(600, 40 + $lineCount * 18);
+
+        $pdf = Pdf::loadView('pos.receipt-pdf', ['transaction' => $transaction, 'paper' => $paper])
+            ->setPaper([0, 0, $widthPt, $heightPt]);
+
+        return $pdf->download('struk-'.$transaction->invoice_number.'.pdf');
     }
 }

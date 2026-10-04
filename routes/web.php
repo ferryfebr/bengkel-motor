@@ -59,6 +59,7 @@ Route::middleware(['auth', 'track.impersonation'])->group(function () {
         Route::post('pos/{transaction}/draft', [PosController::class, 'saveDraft'])->name('pos.draft');
         Route::post('pos/{transaction}/checkout', [PosController::class, 'checkout'])->name('pos.checkout');
         Route::get('pos/{transaction}/receipt', [PosController::class, 'receipt'])->name('pos.receipt');
+        Route::get('pos/{transaction}/receipt-pdf', [PosController::class, 'receiptPdf'])->name('pos.receipt.pdf');
     });
 
     // Gaji Karyawan (mekanik) - kasir & owner.

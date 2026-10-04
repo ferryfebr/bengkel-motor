@@ -133,6 +133,7 @@ class PurchaseOrderController extends Controller
 
         $open = '<div class="po-toolbar no-print">'
             .'<button type="button" class="btn btn-print" onclick="window.print()">Cetak / Simpan PDF</button>'
+            .'<a class="btn btn-back" href="'.e(route('purchase-orders.pdf', $purchaseOrder)).'">Unduh PDF</a>'
             .'<a class="btn btn-back" href="'.e(route('purchase-orders.show', $purchaseOrder)).'">Kembali</a>'
             .'</div><div class="po-scroll"><div class="po-paper">';
 

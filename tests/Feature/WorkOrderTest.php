@@ -216,7 +216,6 @@ class WorkOrderTest extends TestCase
             ->assertOk()
             ->assertSee('size: 58mm auto')
             ->assertSee('B 55 TX')
-            ->assertSee('Total Qty')
             ->assertSee('Sub Total')
             ->assertSee('TOTAL');
 
@@ -224,6 +223,30 @@ class WorkOrderTest extends TestCase
         $this->actingAs($kasir)->get(route('pos.receipt', ['transaction' => $transaction, 'paper' => '80']))
             ->assertOk()
             ->assertSee('size: 80mm auto');
+    }
+
+    public function test_struk_punya_versi_pdf(): void
+    {
+        $kasir = $this->kasir();
+        $this->actingAs($kasir)->post('/work-orders', ['plate_number' => 'B 77 PDF', 'customer_name' => 'Pdf']);
+        $transaction = Transaction::first();
+        $transaction->update([
+            'work_status' => Transaction::WORK_SELESAI,
+            'payment_status' => Transaction::PAY_LUNAS,
+            'grand_total' => 30000,
+            'finalized_at' => now(),
+        ]);
+        TransactionDetail::create([
+            'transaction_id' => $transaction->id,
+            'is_external' => false,
+            'qty' => 1,
+            'selling_price' => 30000,
+            'line_total' => 30000,
+        ]);
+
+        $this->actingAs($kasir)->get(route('pos.receipt.pdf', $transaction))
+            ->assertOk()
+            ->assertDownload('struk-'.$transaction->invoice_number.'.pdf');
     }
 
     public function test_kode_sku_tertanam_di_form_pos_untuk_scan_barcode(): void

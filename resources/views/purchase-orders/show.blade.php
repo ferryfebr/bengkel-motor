@@ -70,6 +70,7 @@
 
         <div class="bg-white border border-line rounded-md p-4 flex flex-wrap items-center gap-3">
             <a href="{{ route('purchase-orders.print', $order) }}" target="_blank" class="btn-primary">Cetak / Simpan PDF</a>
+            <a href="{{ route('purchase-orders.pdf', $order) }}" class="btn-secondary">Unduh PDF</a>
 
             @if ($order->isReceived())
                 <span class="text-sm text-success font-medium">Barang sudah diterima &amp; stok ditambahkan.</span>
