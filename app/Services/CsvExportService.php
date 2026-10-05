@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\ActivityLog;
+use App\Models\PurchaseOrder;
 use App\Models\Transaction;
 use App\Support\ActivityPresenter;
 use Illuminate\Database\Eloquent\Builder;
@@ -197,18 +198,166 @@ class CsvExportService
             }
 
             foreach ($query->lazyById(500) as $log) {
-                fputcsv($out, [
-                    $this->dt($log->created_at),
-                    $log->user?->name ?? '-',
-                    $log->impersonated_by ? 'Admin #'.$log->impersonated_by.' (Login Sebagai)' : '-',
-                    ActivityPresenter::CATEGORIES[ActivityPresenter::category($log->action, $log->model_type)] ?? '-',
-                    ActivityPresenter::label($log->action),
-                    ActivityPresenter::describe($log),
-                ], self::DELIMITER);
+                fputcsv($out, $this->activityRow($log), self::DELIMITER);
             }
 
             fclose($out);
         }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
+    }
+
+    /**
+     * Baris CSV satu activity_log.
+     *
+     * @return array<int, mixed>
+     */
+    private function activityRow(ActivityLog $log): array
+    {
+        return [
+            $this->dt($log->created_at),
+            $log->user?->name ?? '-',
+            $log->impersonated_by ? 'Admin #'.$log->impersonated_by.' (Login Sebagai)' : '-',
+            ActivityPresenter::CATEGORIES[ActivityPresenter::category($log->action, $log->model_type)] ?? '-',
+            ActivityPresenter::label($log->action),
+            ActivityPresenter::describe($log),
+        ];
+    }
+
+    /**
+     * Tulis file arsip activity_logs (dipakai activity:prune sebelum hapus).
+     * Kembalikan path relatif terhadap storage/app.
+     *
+     * @param  iterable<ActivityLog>  $logs
+     */
+    public function writeActivityLogsArchive(iterable $logs, string $label): string
+    {
+        $dir = storage_path('app/'.self::ARCHIVE_DIR);
+        if (! is_dir($dir)) {
+            mkdir($dir, 0755, true);
+        }
+
+        $relative = self::ARCHIVE_DIR.'/arsip-aktivitas-'.$label.'.csv';
+        $path = storage_path('app/'.$relative);
+
+        $out = fopen($path, 'w');
+        $this->writeBom($out);
+        fputcsv($out, [
+            'Waktu', 'Pelaku', 'Dipengaruhi Oleh', 'Kategori', 'Aktivitas', 'Keterangan',
+        ], self::DELIMITER);
+
+        foreach ($logs as $log) {
+            fputcsv($out, $this->activityRow($log), self::DELIMITER);
+        }
+
+        fclose($out);
+
+        return $relative;
+    }
+
+    /**
+     * Tulis file arsip pesanan pembelian (dipakai purchase-orders:retain sebelum hapus).
+     * Kembalikan path relatif terhadap storage/app.
+     *
+     * @param  iterable<PurchaseOrder>  $orders
+     */
+    public function writePurchaseOrdersArchive(iterable $orders, string $label): string
+    {
+        $dir = storage_path('app/'.self::ARCHIVE_DIR);
+        if (! is_dir($dir)) {
+            mkdir($dir, 0755, true);
+        }
+
+        $relative = self::ARCHIVE_DIR.'/arsip-po-'.$label.'.csv';
+        $path = storage_path('app/'.$relative);
+
+        $out = fopen($path, 'w');
+        $this->writeBom($out);
+        fputcsv($out, [
+            'PO', 'Tanggal', 'Supplier', 'Status', 'Dibuat Oleh', 'Diterima Oleh',
+            'Tanggal Diterima', 'Catatan', 'Nama Produk', 'Qty', 'Harga Beli (Rp)',
+            'Subtotal (Rp)', 'Total PO (Rp)',
+        ], self::DELIMITER);
+
+        foreach ($orders as $po) {
+            $this->writePurchaseOrderRows($out, $po);
+        }
+
+        fclose($out);
+
+        return $relative;
+    }
+
+    /**
+     * Baris arsip satu PO (1 baris per item; PO tanpa item tetap 1 baris).
+     */
+    private function writePurchaseOrderRows($out, PurchaseOrder $po): void
+    {
+        $po->loadMissing(['supplier', 'user', 'receiver', 'items']);
+
+        $base = [
+            $po->po_number,
+            $this->dt($po->created_at),
+            $po->supplier?->name ?? '-',
+            $po->statusLabel(),
+            $po->user?->name ?? '-',
+            $po->receiver?->name ?? '-',
+            $po->received_at ? $this->dt($po->received_at) : '-',
+            $po->notes ?? '-',
+        ];
+
+        if ($po->items->isEmpty()) {
+            fputcsv($out, array_merge($base, ['-', '', $this->num(0), $this->num(0), $this->num($po->total)]), self::DELIMITER);
+
+            return;
+        }
+
+        foreach ($po->items as $it) {
+            fputcsv($out, array_merge($base, [
+                $it->product_name,
+                $it->qty,
+                $this->num($it->purchase_price),
+                $this->num($it->line_total),
+                $this->num($po->total),
+            ]), self::DELIMITER);
+        }
+    }
+
+    /**
+     * Verifikasi file arsip benar-benar tertulis & lengkap SEBELUM data dihapus.
+     * Cek: file ada, ukuran > 0, berawalan BOM UTF-8, dan jumlah baris data >= $minRows.
+     */
+    public function verifyArchiveFile(string $relative, int $minRows): bool
+    {
+        $path = storage_path('app/'.$relative);
+
+        if (! is_file($path) || filesize($path) <= 0) {
+            return false;
+        }
+
+        $handle = fopen($path, 'r');
+        if ($handle === false) {
+            return false;
+        }
+
+        $rows = 0;
+        $header = true;
+        while (($line = fgets($handle)) !== false) {
+            if ($header) {
+                $header = false;
+                if (! str_starts_with($line, "\xEF\xBB\xBF")) {
+                    fclose($handle);
+
+                    return false;
+                }
+                continue;
+            }
+            if (trim($line) !== '') {
+                $rows++;
+            }
+        }
+
+        fclose($handle);
+
+        return $rows >= $minRows;
     }
 
     /**

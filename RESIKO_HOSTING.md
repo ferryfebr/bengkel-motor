@@ -2,7 +2,7 @@
 
 Analisis risiko performa & stabilitas untuk hosting **Domainesia shared, 2GB SSD NVMe, MySQL** — beserta pagar pengaman yang dipilih. Requirement klien **tidak diubah**; dokumen ini hanya mengatur *cara* agar web tidak down.
 
-> **Keputusan yang sudah diambil:** batas **8.000 transaksi final**; retensi `activity_logs` **3 bulan / 3.000 baris** (FIFO, tanpa arsip otomatis); file arsip transaksi **disimpan permanen** dan diunduh lewat menu **Arsip & Backup**; reposisi dijalankan **via cron**, bukan saat checkout.
+> **Keputusan yang sudah diambil:** batas **8.000 transaksi final**; retensi `activity_logs` **3 bulan / 3.000 baris** (diarsip ke CSV permanen dulu, baru dihapus — file diunduh lewat menu **Arsip & Backup**); setiap proses retensi dicatat di tabel `retention_run_logs` (append-only, tidak ikut retensi); reposisi dijalankan **via cron**, bukan saat checkout.
 
 ---
 
@@ -34,7 +34,8 @@ Penyumbang ukuran nyata:
 
 **Mitigasi (diterapkan):**
 - Batas **8.000 transaksi final** (J1) — command `transactions:retain` (arsip CSV lalu hapus), dijadwalkan 02:30.
-- Retensi `activity_logs` **3 bulan / 3.000 baris** (J9) — command `activity:prune`, dijadwalkan 02:45. Tanpa arsip otomatis (export manual tetap tersedia di Panel Sistem).
+- Retensi `activity_logs` **3 bulan / 3.000 baris** (J9) — command `activity:prune`, dijadwalkan 02:45. **Arsip CSV dulu, verifikasi, baru hapus** (pola sama seperti `transactions:retain`); arsip tersimpan permanen & diunduh via menu **Arsip & Backup**.
+- Setiap proses `transactions:retain` & `activity:prune` dicatat di `retention_run_logs` (append-only, tidak ikut retensi): waktu, pemicu (cron/manual), user_id Super Admin bila manual, jumlah baris diarsip/dihapus per tabel.
 - `stock_histories` **tidak** dihapus (audit inti).
 - File arsip transaksi **disimpan permanen** (J8); owner mengunduh via menu **Arsip & Backup**.
 - `laravel.log` rotasi harian, hapus >14 hari (J10) — `logs:rotate`.
@@ -104,7 +105,7 @@ Asumsi per transaksi final: 3 detail produk + 2 jasa + 3 pembagian mekanik + 1 p
 | # | Pagar | Nilai |
 |---|---|---|
 | 1 | Batas transaksi final | 8.000 (`transactions:retain`) |
-| 2 | Retensi `activity_logs` | 3 bulan / 3.000 baris, FIFO, tanpa arsip otomatis |
+| 2 | Retensi `activity_logs` | 3 bulan / 3.000 baris; arsip CSV permanen via menu Arsip & Backup, lalu hapus |
 | 3 | `stock_histories` | tidak dihapus (append-only) |
 | 4 | File arsip CSV | disimpan permanen, unduh via menu Arsip & Backup |
 | 5 | `laravel.log` | rotasi harian, hapus >14 hari |
@@ -115,13 +116,14 @@ Asumsi per transaksi final: 3 detail produk + 2 jasa + 3 pembagian mekanik + 1 p
 | 10 | Laporan | `daily_summaries`, bukan hitung ulang |
 | 11 | Aset | build lokal, tanpa `node_modules` di hosting |
 | 12 | Tombol retensi manual | Panel Sistem (fallback bila cron mati) |
-| 13 | Pesanan pembelian (PO) | maks 2.000 PO (`purchase-orders:retain`) |
+| 13 | Pesanan pembelian (PO) | maks 2.000 PO; arsip CSV permanen lalu hapus (`purchase-orders:retain`) |
+| 14 | Jejak proses retensi | `retention_run_logs` (append-only, tidak ikut retensi) |
 
 ---
 
 ## 5. Batas yang Tetap Risiko (jujur)
 
-1. Karena `activity_logs` hanya disimpan 3 bulan / 3.000 baris, penyelidikan masalah/kecurangan lama terbatas ~3 bulan terakhir. Data transaksi & keuangan tetap utuh.
+1. Karena `activity_logs` hanya disimpan 3 bulan / 3.000 baris, penyelidikan masalah/kecurangan lama dibatasi pada data di DB. Namun file arsip CSV aktivitas tersimpan permanen (menu Arsip & Backup) dan bisa dibuka kembali. Data transaksi & keuangan tetap utuh.
 2. Kalau cron hosting tidak andal, reposisi harus dijalankan manual berkala via tombol **Jalankan Retensi** di Panel Sistem.
 3. Kalau disk mendekati penuh, tidak ada jalan lain selain membersihkan arsip/log atau **upgrade hosting** (yang sudah dinyatakan tidak bisa). Karena itu pagar #1–#12 **wajib** diimplementasikan, bukan opsional.
 4. File arsip transaksi disimpan di server. Owner **wajib** mengunduh & menyimpan cadangan sendiri (menu Arsip & Backup) — file di server bukan backup aman bila hosting bermasalah.

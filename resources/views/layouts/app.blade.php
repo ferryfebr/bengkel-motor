@@ -29,7 +29,7 @@
             ['route' => 'cash.index', 'label' => 'Kas Bengkel', 'pattern' => 'cash.*', 'roles' => ['kasir', 'owner', 'super_admin'], 'icon' => 'cash'],
             ['route' => 'payroll.index', 'label' => 'Gaji Karyawan', 'pattern' => 'payroll.*', 'roles' => ['kasir', 'owner', 'super_admin'], 'icon' => 'payroll'],
             ['route' => 'manage.index', 'label' => 'Manajemen', 'pattern' => 'manage.*', 'roles' => ['kasir', 'owner', 'super_admin'], 'icon' => 'box'],
-            ['route' => 'purchase-orders.index', 'label' => 'Pesanan Pembelian', 'pattern' => 'purchase-orders.*', 'roles' => ['owner', 'super_admin'], 'icon' => 'queue'],
+            ['route' => 'purchase-orders.index', 'label' => 'Order', 'pattern' => 'purchase-orders.*', 'roles' => ['owner', 'super_admin'], 'icon' => 'queue'],
             ['route' => 'reports.gross', 'label' => 'Laporan', 'pattern' => 'reports.*', 'roles' => ['kasir', 'owner', 'super_admin'], 'icon' => 'chart'],
             ['route' => 'activity.index', 'label' => 'Aktivitas', 'pattern' => 'activity.*', 'roles' => ['owner', 'super_admin'], 'icon' => 'activity'],
             ['route' => 'archives.index', 'label' => 'Arsip & Backup', 'pattern' => 'archives.*', 'roles' => ['owner', 'super_admin'], 'icon' => 'server'],

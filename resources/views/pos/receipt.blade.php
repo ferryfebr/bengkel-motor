@@ -22,16 +22,16 @@
             margin-right: auto;
             text-align: left;
             font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-            font-size: {{ $paper === '80' ? '21px' : '17px' }};
-            line-height: 1.5;
+            font-size: {{ $paper === '80' ? '17px' : '13.5px' }};
+            line-height: 1.25;
             color: #000;
             background: #fff;
         }
-        .receipt > div { margin-bottom: 4px; }
+        .receipt > div { margin-bottom: 2px; }
         .receipt .dash {
             border: 0;
             border-top: 1px dashed #000;
-            margin: 9px 0;
+            margin: 5px 0;
         }
         .receipt-logo {
             display: block;
@@ -39,9 +39,9 @@
             margin: 0 auto 3mm;
         }
         .receipt .item-name,
-        .receipt .item-line { line-height: 1.35; }
-        .receipt .item-name { margin-bottom: 2px; }
-        .receipt .item-line { padding-bottom: 3px; }
+        .receipt .item-line { line-height: 1.2; }
+        .receipt .item-name { margin-bottom: 1px; }
+        .receipt .item-line { padding-bottom: 2px; }
         @media print {
             @page { size: {{ $paper }}mm auto; margin: 0mm; }
             html, body {

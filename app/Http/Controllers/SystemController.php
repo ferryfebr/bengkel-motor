@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\ActivityLog;
+use App\Models\RetentionRunLog;
 use App\Models\Transaction;
 use App\Models\TransactionArchive;
 use App\Services\CsvExportService;
@@ -41,6 +42,7 @@ class SystemController extends Controller
                 'purchase_orders' => (int) config('retention.purchase_orders', 2000),
             ],
             'disk' => $this->diskUsage->report(),
+            'retentionRuns' => RetentionRunLog::with('user')->orderByDesc('id')->limit(10)->get(),
         ]);
     }
 
@@ -56,14 +58,24 @@ class SystemController extends Controller
 
     /**
      * Jalankan retensi sekarang (fallback bila cron hosting tidak jalan).
+     * Dijalankan sebagai 'manual' atas nama Super Admin agar tercatat di retention_run_logs.
      */
-    public function runRetention(): RedirectResponse
+    public function runRetention(Request $request): RedirectResponse
     {
         $outputs = [];
+        $userId = $request->user()->id;
 
-        foreach (['transactions:retain', 'activity:prune', 'purchase-orders:retain', 'sessions:prune', 'logs:rotate'] as $command) {
+        $commands = [
+            'transactions:retain' => ['--trigger' => RetentionRunLog::TRIGGER_MANUAL, '--user-id' => $userId],
+            'activity:prune' => ['--trigger' => RetentionRunLog::TRIGGER_MANUAL, '--user-id' => $userId],
+            'purchase-orders:retain' => ['--trigger' => RetentionRunLog::TRIGGER_MANUAL, '--user-id' => $userId],
+            'sessions:prune' => [],
+            'logs:rotate' => [],
+        ];
+
+        foreach ($commands as $command => $options) {
             try {
-                Artisan::call($command);
+                Artisan::call($command, $options);
                 $outputs[] = trim(Artisan::output());
             } catch (Throwable $e) {
                 $outputs[] = "{$command} gagal: ".$e->getMessage();

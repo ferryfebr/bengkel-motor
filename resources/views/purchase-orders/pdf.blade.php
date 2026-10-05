@@ -6,7 +6,7 @@
 <html lang="id">
 <head>
     <meta charset="utf-8">
-    <title>Surat Pesanan {{ $order->po_number }}</title>
+    <title>Order Produk {{ $order->po_number }}</title>
     <style>
         * { font-family: DejaVu Sans, sans-serif; }
         body {
@@ -44,11 +44,11 @@
 
     <div class="header">
         <div class="brand">{{ config('app.name', 'One Nine Nine') }}</div>
-        <div class="muted">Bengkel Motor</div>
+        <div class="muted">One Nine Nine Motor</div>
     </div>
 
-    <div class="title">SURAT PESANAN PRODUK</div>
-    <div class="docnum">No. {{ $order->po_number }} &middot; {{ $order->created_at->format('d/m/Y') }}</div>
+    <div class="title">ORDER PRODUK</div>
+    <div class="docnum"> {{ $order->created_at->format('d/m/Y') }}</div>
 
     <table class="meta">
         <tr>
@@ -74,9 +74,9 @@
             <tr>
                 <th width="6%">No</th>
                 <th>Nama Produk</th>
-                <th width="10%" class="right">Qty</th>
-                <th width="22%" class="right">Harga Beli</th>
-                <th width="22%" class="right">Subtotal</th>
+                <th width="10%" class="right">Jumlah</th>
+                {{-- <th width="22%" class="right">Harga Beli</th>
+                <th width="22%" class="right">Subtotal</th> --}}
             </tr>
         </thead>
         <tbody>
@@ -85,13 +85,13 @@
                     <td>{{ $i + 1 }}</td>
                     <td>{{ $item->product_name }}</td>
                     <td class="right">{{ $item->qty }}</td>
-                    <td class="right">Rp {{ number_format($item->purchase_price, 0, ',', '.') }}</td>
-                    <td class="right">Rp {{ number_format($item->line_total, 0, ',', '.') }}</td>
+                    {{-- <td class="right">Rp {{ number_format($item->purchase_price, 0, ',', '.') }}</td>
+                    <td class="right">Rp {{ number_format($item->line_total, 0, ',', '.') }}</td> --}}
                 </tr>
             @endforeach
             <tr class="total-row">
-                <td colspan="4" class="right">TOTAL</td>
-                <td class="right">Rp {{ number_format($order->total, 0, ',', '.') }}</td>
+                {{-- <td colspan="4" class="right">TOTAL</td> --}}
+                {{-- <td class="right">Rp {{ number_format($order->total, 0, ',', '.') }}</td> --}}
             </tr>
         </tbody>
     </table>
@@ -100,7 +100,7 @@
         <p style="margin-top:14px"><strong>Catatan:</strong> {{ $order->notes }}</p>
     @endif
 
-    <table class="sign">
+    {{-- <table class="sign">
         <tr>
             <td>
                 <div class="line">Pemesan</div>
@@ -109,6 +109,6 @@
                 <div class="line">Distributor</div>
             </td>
         </tr>
-    </table>
+    </table> --}}
 </body>
 </html>

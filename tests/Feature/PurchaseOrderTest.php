@@ -5,15 +5,45 @@ namespace Tests\Feature;
 use App\Models\Product;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderItem;
+use App\Models\RetentionRunLog;
 use App\Models\StockHistory;
 use App\Models\Supplier;
+use App\Models\TransactionArchive;
 use App\Models\User;
+use App\Services\CsvExportService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\File;
 use Tests\TestCase;
 
 class PurchaseOrderTest extends TestCase
 {
     use RefreshDatabase;
+
+    private array $preExistingArchives = [];
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $dir = storage_path('app/archives');
+        $this->preExistingArchives = is_dir($dir)
+            ? array_map(fn ($f) => $f->getFilename(), File::files($dir))
+            : [];
+    }
+
+    protected function tearDown(): void
+    {
+        $dir = storage_path('app/archives');
+        if (is_dir($dir)) {
+            foreach (File::files($dir) as $file) {
+                if (! in_array($file->getFilename(), $this->preExistingArchives, true)) {
+                    File::delete($file->getPathname());
+                }
+            }
+        }
+
+        parent::tearDown();
+    }
 
     private function owner(): User
     {
@@ -234,5 +264,57 @@ class PurchaseOrderTest extends TestCase
         $this->assertSame(1, PurchaseOrder::count());
         // Item PO lama ikut terhapus (cascade).
         $this->assertSame(1, PurchaseOrderItem::count());
+
+        // Arsip PO tercatat & file valid (pola sama seperti retensi transaksi).
+        $archive = TransactionArchive::where('type', TransactionArchive::TYPE_PURCHASE_ORDERS)->first();
+        $this->assertNotNull($archive);
+        $this->assertSame(2, $archive->transaction_count);
+        $this->assertTrue($archive->exists(), 'File arsip PO harus tertulis.');
+
+        $content = File::get(storage_path('app/'.$archive->archive_path));
+        $this->assertStringContainsString('PO;Tanggal;Supplier;', $content);
+        $this->assertStringContainsString("\xEF\xBB\xBF", $content);
+
+        // Jejak retensi.
+        $run = RetentionRunLog::where('run_type', RetentionRunLog::TYPE_PURCHASE_ORDERS)->first();
+        $this->assertNotNull($run);
+        $this->assertSame(RetentionRunLog::TRIGGER_CRON, $run->trigger);
+        $this->assertSame(2, $run->archived_count);
+        $this->assertSame(2, $run->deleted_count);
+        $this->assertSame(2, $run->details['purchase_order_items']);
+    }
+
+    public function test_retensi_po_gagal_verifikasi_tidak_menghapus_dan_catat_failed(): void
+    {
+        $owner = $this->owner();
+
+        for ($i = 0; $i < 3; $i++) {
+            $po = PurchaseOrder::create([
+                'po_number' => 'PO-VER-'.str_pad((string) $i, 4, '0', STR_PAD_LEFT),
+                'user_id' => $owner->id,
+                'status' => PurchaseOrder::STATUS_DRAFT,
+                'total' => 1000,
+            ]);
+            PurchaseOrderItem::create([
+                'purchase_order_id' => $po->id,
+                'product_name' => 'X',
+                'qty' => 1,
+                'purchase_price' => 1000,
+                'line_total' => 1000,
+            ]);
+        }
+
+        $this->partialMock(CsvExportService::class, function ($mock) {
+            $mock->shouldReceive('verifyArchiveFile')->once()->andReturn(false);
+        });
+
+        $this->artisan('purchase-orders:retain', ['--max' => 1])->assertFailed();
+
+        $this->assertSame(3, PurchaseOrder::count());
+
+        $run = RetentionRunLog::where('run_type', RetentionRunLog::TYPE_PURCHASE_ORDERS)->first();
+        $this->assertNotNull($run);
+        $this->assertSame(RetentionRunLog::STATUS_FAILED, $run->status);
+        $this->assertSame(0, $run->deleted_count);
     }
 }

@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\ActivityLog;
 use App\Models\Mechanic;
 use App\Models\Product;
+use App\Models\RetentionRunLog;
 use App\Models\StockHistory;
 use App\Models\Transaction;
 use App\Models\TransactionArchive;
@@ -28,11 +29,34 @@ class RetentionTest extends TestCase
 
     private array $createdFiles = [];
 
+    private array $preExistingArchives = [];
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $dir = storage_path('app/archives');
+        $this->preExistingArchives = is_dir($dir)
+            ? array_map(fn ($f) => $f->getFilename(), File::files($dir))
+            : [];
+    }
+
     protected function tearDown(): void
     {
         foreach ($this->createdFiles as $relative) {
             File::delete(storage_path('app/'.$relative));
         }
+
+        // Hapus file arsip yang dibuat selama test agar tidak menumpuk.
+        $dir = storage_path('app/archives');
+        if (is_dir($dir)) {
+            foreach (File::files($dir) as $file) {
+                if (! in_array($file->getFilename(), $this->preExistingArchives, true)) {
+                    File::delete($file->getPathname());
+                }
+            }
+        }
+
         parent::tearDown();
     }
 
@@ -182,6 +206,150 @@ class RetentionTest extends TestCase
         $this->artisan('activity:prune', ['--max' => 2, '--months' => 12])->assertSuccessful();
 
         $this->assertSame(2, ActivityLog::count());
+    }
+
+    public function test_activity_prune_mengarsip_csv_lalu_menghapus_dan_mencatat_run(): void
+    {
+        $kasir = User::factory()->kasir()->create();
+
+        for ($i = 0; $i < 5; $i++) {
+            ActivityLog::create([
+                'user_id' => $kasir->id,
+                'action' => 'create',
+                'model_type' => Product::class,
+            ]);
+        }
+
+        $this->artisan('activity:prune', ['--max' => 2, '--months' => 12])->assertSuccessful();
+
+        // 2 baris terbaru tetap.
+        $this->assertSame(2, ActivityLog::count());
+
+        // Arsip aktivitas tercatat & file valid.
+        $archive = TransactionArchive::where('type', TransactionArchive::TYPE_ACTIVITY)->first();
+        $this->assertNotNull($archive);
+        $this->assertSame(3, $archive->transaction_count);
+        $this->assertTrue($archive->exists(), 'File arsip aktivitas harus tertulis.');
+        $this->createdFiles[] = $archive->archive_path;
+
+        $content = File::get(storage_path('app/'.$archive->archive_path));
+        $this->assertStringContainsString('Waktu;Pelaku;', $content);
+        $this->assertStringContainsString('Kategori;Aktivitas;Keterangan', $content);
+        $this->assertStringContainsString("\xEF\xBB\xBF", $content);
+
+        // Jejak retensi append-only.
+        $run = RetentionRunLog::where('run_type', RetentionRunLog::TYPE_ACTIVITY)->first();
+        $this->assertNotNull($run);
+        $this->assertSame(RetentionRunLog::TRIGGER_CRON, $run->trigger);
+        $this->assertNull($run->user_id);
+        $this->assertSame(3, $run->archived_count);
+        $this->assertSame(3, $run->deleted_count);
+        $this->assertSame(3, $run->details['activity_logs']);
+    }
+
+    public function test_activity_prune_dry_run_tidak_mengubah_atau_mencatat(): void
+    {
+        $kasir = User::factory()->kasir()->create();
+
+        for ($i = 0; $i < 5; $i++) {
+            ActivityLog::create([
+                'user_id' => $kasir->id,
+                'action' => 'create',
+                'model_type' => Product::class,
+            ]);
+        }
+
+        $this->artisan('activity:prune', ['--max' => 2, '--months' => 12, '--dry-run' => true])->assertSuccessful();
+
+        $this->assertSame(5, ActivityLog::count());
+        $this->assertSame(0, TransactionArchive::where('type', TransactionArchive::TYPE_ACTIVITY)->count());
+        $this->assertSame(0, RetentionRunLog::count());
+    }
+
+    public function test_transactions_retain_mencatat_run_log_cron(): void
+    {
+        $this->makeFinalTransaction();
+        $this->makeFinalTransaction();
+
+        $this->artisan('transactions:retain', ['--limit' => 1])->assertSuccessful();
+
+        $run = RetentionRunLog::where('run_type', RetentionRunLog::TYPE_TRANSACTIONS)->first();
+        $this->assertNotNull($run);
+        $this->assertSame(RetentionRunLog::TRIGGER_CRON, $run->trigger);
+        $this->assertNull($run->user_id);
+        $this->assertSame(1, $run->archived_count);
+        $this->assertSame(1, $run->deleted_count);
+        $this->assertSame(1, $run->details['transaction_details']);
+        $this->assertArrayHasKey('archive_path', $run->details);
+    }
+
+    public function test_retain_gagal_verifikasi_tidak_menghapus_dan_catat_failed(): void
+    {
+        $this->makeFinalTransaction();
+        $this->makeFinalTransaction();
+
+        // Paksa verifikasi file arsip gagal -> tidak boleh ada penghapusan.
+        $this->partialMock(CsvExportService::class, function ($mock) {
+            $mock->shouldReceive('verifyArchiveFile')->once()->andReturn(false);
+        });
+
+        $this->artisan('transactions:retain', ['--limit' => 1])->assertFailed();
+
+        $this->assertSame(2, Transaction::final()->count());
+
+        $run = RetentionRunLog::where('run_type', RetentionRunLog::TYPE_TRANSACTIONS)->first();
+        $this->assertNotNull($run);
+        $this->assertSame(RetentionRunLog::STATUS_FAILED, $run->status);
+        $this->assertSame(0, $run->deleted_count);
+    }
+
+    public function test_activity_prune_gagal_verifikasi_tidak_menghapus_dan_catat_failed(): void
+    {
+        $kasir = User::factory()->kasir()->create();
+
+        for ($i = 0; $i < 5; $i++) {
+            ActivityLog::create([
+                'user_id' => $kasir->id,
+                'action' => 'create',
+                'model_type' => Product::class,
+            ]);
+        }
+
+        $this->partialMock(CsvExportService::class, function ($mock) {
+            $mock->shouldReceive('verifyArchiveFile')->once()->andReturn(false);
+        });
+
+        $this->artisan('activity:prune', ['--max' => 2, '--months' => 12])->assertFailed();
+
+        $this->assertSame(5, ActivityLog::count());
+
+        $run = RetentionRunLog::where('run_type', RetentionRunLog::TYPE_ACTIVITY)->first();
+        $this->assertNotNull($run);
+        $this->assertSame(RetentionRunLog::STATUS_FAILED, $run->status);
+        $this->assertSame(0, $run->deleted_count);
+    }
+
+    public function test_retensi_manual_via_panel_mencatat_trigger_dan_user(): void
+    {
+        $super = User::factory()->superAdmin()->create();
+
+        $this->actingAs($super)->post('/system/retention')->assertRedirect(route('system.index'));
+
+        $run = RetentionRunLog::where('trigger', RetentionRunLog::TRIGGER_MANUAL)
+            ->where('user_id', $super->id)
+            ->where('run_type', RetentionRunLog::TYPE_TRANSACTIONS)
+            ->first();
+
+        $this->assertNotNull($run);
+        $this->assertSame(RetentionRunLog::TRIGGER_MANUAL, $run->trigger);
+        $this->assertSame($super->id, $run->user_id);
+
+        // Proses aktivitas juga tercatat manual atas nama Super Admin.
+        $this->assertDatabaseHas('retention_run_logs', [
+            'run_type' => RetentionRunLog::TYPE_ACTIVITY,
+            'trigger' => RetentionRunLog::TRIGGER_MANUAL,
+            'user_id' => $super->id,
+        ]);
     }
 
     public function test_dry_run_tidak_mengubah_data(): void

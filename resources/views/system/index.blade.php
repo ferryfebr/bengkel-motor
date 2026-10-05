@@ -70,8 +70,8 @@
             <div class="font-semibold text-ink mb-2">Pagar Retensi Aktif</div>
             <ul class="text-sm text-ink-600 space-y-1">
                 <li>• Transaksi final disimpan maksimal <strong>{{ number_format($retention['transactions']) }}</strong>; lebih dari itu diarsip ke CSV lalu dihapus.</li>
-                <li>• Aktivitas disimpan maksimal <strong>{{ number_format($retention['activity_max']) }}</strong> baris atau <strong>{{ $retention['activity_months'] }} bulan</strong>.</li>
-                <li>• Pesanan pembelian (PO) disimpan maksimal <strong>{{ number_format($retention['purchase_orders']) }}</strong>.</li>
+                <li>• Aktivitas disimpan maksimal <strong>{{ number_format($retention['activity_max']) }}</strong> baris atau <strong>{{ $retention['activity_months'] }} bulan</strong>; lebih dari itu diarsip ke CSV lalu dihapus.</li>
+                <li>• Pesanan pembelian (PO) disimpan maksimal <strong>{{ number_format($retention['purchase_orders']) }}</strong>; lebih dari itu diarsip ke CSV lalu dihapus.</li>
                 <li>• Log aplikasi dirotasi otomatis (14 hari).</li>
                 <li>• File arsip disimpan permanen; unduh via menu <a href="{{ route('archives.index') }}" class="text-signal font-medium hover:underline">Arsip &amp; Backup</a>.</li>
             </ul>
@@ -81,6 +81,45 @@
             <x-stat-card label="Transaksi Final" :value="number_format($finalCount)" />
             <x-stat-card label="Activity Log" :value="number_format($activityLogCount)" />
             <x-stat-card label="File Arsip" :value="number_format($archiveCount)" />
+        </div>
+
+        {{-- Jejak proses retensi (retention_run_logs, append-only) --}}
+        <div class="bg-white border border-line rounded-md overflow-x-auto">
+            <div class="px-5 py-3 border-b border-line font-semibold text-ink">Riwayat Proses Retensi</div>
+            <table class="min-w-full font-condensed text-sm">
+                <thead class="bg-paper-dim text-ink">
+                    <tr>
+                        <th class="px-4 py-3 text-left font-semibold">Waktu</th>
+                        <th class="px-4 py-3 text-left font-semibold">Proses</th>
+                        <th class="px-4 py-3 text-left font-semibold">Pemicu</th>
+                        <th class="px-4 py-3 text-left font-semibold">Oleh</th>
+                        <th class="px-4 py-3 text-right font-semibold">Diarsip</th>
+                        <th class="px-4 py-3 text-right font-semibold">Dihapus</th>
+                        <th class="px-4 py-3 text-left font-semibold">Status</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-line">
+                    @forelse ($retentionRuns as $run)
+                        <tr class="hover:bg-paper-dim/60">
+                            <td class="px-4 py-2.5 text-ink-700 whitespace-nowrap">{{ $run->created_at?->format('d/m/Y H:i') }}</td>
+                            <td class="px-4 py-2.5 text-ink-700">{{ $run->runTypeLabel() }}</td>
+                            <td class="px-4 py-2.5 text-ink-600">{{ $run->triggerLabel() }}</td>
+                            <td class="px-4 py-2.5 text-ink-600">{{ $run->user?->name ?? 'Sistem (cron)' }}</td>
+                            <td class="px-4 py-2.5 text-right tabular text-ink-700">{{ number_format($run->archived_count) }}</td>
+                            <td class="px-4 py-2.5 text-right tabular text-ink-700">{{ number_format($run->deleted_count) }}</td>
+                            <td class="px-4 py-2.5">
+                                @if ($run->status === \App\Models\RetentionRunLog::STATUS_FAILED)
+                                    <span class="badge bg-danger-light text-danger">Gagal</span>
+                                @else
+                                    <span class="badge bg-success-light text-success">Sukses</span>
+                                @endif
+                            </td>
+                        </tr>
+                    @empty
+                        <tr><td colspan="7" class="px-4 py-8 text-center text-ink-400">Belum ada proses retensi.</td></tr>
+                    @endforelse
+                </tbody>
+            </table>
         </div>
 
         <div class="bg-white border border-line rounded-md p-5 flex flex-wrap items-center gap-4">
