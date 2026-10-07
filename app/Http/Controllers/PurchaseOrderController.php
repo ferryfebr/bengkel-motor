@@ -27,10 +27,10 @@ class PurchaseOrderController extends Controller
         $orders = PurchaseOrder::with(['supplier', 'user'])
             ->when($request->filled('status') && $request->status !== 'semua', fn ($q) => $q->where('status', $request->string('status')))
             ->when($request->filled('q'), function ($q) use ($request) {
-                $q = $request->string('q');
-                $q->where(function ($sub) use ($q) {
-                    $sub->where('po_number', 'like', "%{$q}%")
-                        ->orWhereHas('supplier', fn ($s) => $s->where('name', 'like', "%{$q}%"));
+                $term = $request->string('q')->toString();
+                $q->where(function ($sub) use ($term) {
+                    $sub->where('po_number', 'like', "%{$term}%")
+                        ->orWhereHas('supplier', fn ($s) => $s->where('name', 'like', "%{$term}%"));
                 });
             })
             ->orderByDesc('created_at')
